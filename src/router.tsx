@@ -28,7 +28,7 @@ function RootLayout() {
       {/* Glass nav bar — hidden on scoreboard for full-screen display */}
       {!isScoreboard && (
         <nav className="glass sticky top-0 z-50 border-b border-border-subtle">
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 flex items-center h-14 gap-8">
+          <div className="px-4 sm:px-6 lg:px-8 flex items-center h-14 gap-8">
             <Link to="/" className="flex items-center gap-3 shrink-0">
               <img
                 src="/brand/The-Ledge-Games-Logo-4.png"

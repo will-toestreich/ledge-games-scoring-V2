@@ -29,6 +29,7 @@ import {
   competitors,
   getDivisionCompetitors,
   getEventScoringProgress,
+  getUnscoredCompetitors,
   getEventLeader,
   getTotalScoringProgress,
   getDivisionStandings,
@@ -789,56 +790,15 @@ function MissionControlTab() {
         </h3>
         <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-3">
           {eventStatuses.map(({ event, totalScored, totalCompetitors, pct, status, divDetails }) => (
-            <div key={event.id} className="card rounded-xl p-4 space-y-3">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2.5">
-                  <div className="w-8 h-8 rounded-lg bg-surface-overlay border border-border-subtle flex items-center justify-center">
-                    <EventIcon eventId={event.id} size={16} className="text-text-secondary" />
-                  </div>
-                  <div>
-                    <h4 className="font-semibold text-text-primary text-sm">{event.name}</h4>
-                    <p className="text-xs text-text-tertiary">
-                      {totalScored} / {totalCompetitors} scored
-                    </p>
-                  </div>
-                </div>
-                <StatusBadge status={status} />
-              </div>
-
-              {/* Progress bar */}
-              <div className="h-1.5 rounded-full bg-surface-overlay overflow-hidden">
-                <div
-                  className="h-full rounded-full transition-all duration-500"
-                  style={{
-                    width: `${pct}%`,
-                    background: status === "complete" ? "#059848" : "#cc1a1a",
-                  }}
-                />
-              </div>
-
-              {/* Per-division breakdown */}
-              <div className="flex gap-2">
-                {divDetails.map((d) => {
-                  const dpct = d.total > 0 ? Math.round((d.scored / d.total) * 100) : 0;
-                  return (
-                    <div key={d.name} className="flex-1 text-center">
-                      <div className="text-[10px] text-text-tertiary uppercase tracking-wider mb-1">
-                        {d.name.slice(0, 3)}
-                      </div>
-                      <div
-                        className="h-1 rounded-full bg-surface-overlay overflow-hidden"
-                      >
-                        <div
-                          className="h-full rounded-full"
-                          style={{ width: `${dpct}%`, backgroundColor: d.color }}
-                        />
-                      </div>
-                      <div className="text-[10px] text-text-tertiary mt-0.5 font-mono">{dpct}%</div>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
+            <EventStatusCard
+              key={event.id}
+              event={event}
+              totalScored={totalScored}
+              totalCompetitors={totalCompetitors}
+              pct={pct}
+              status={status}
+              divDetails={divDetails}
+            />
           ))}
         </div>
       </div>
@@ -883,6 +843,124 @@ function MissionControlTab() {
           })}
         </div>
       </div>
+    </div>
+  );
+}
+
+function EventStatusCard({
+  event,
+  totalScored,
+  totalCompetitors,
+  pct,
+  status,
+  divDetails,
+}: {
+  event: { id: string; name: string };
+  totalScored: number;
+  totalCompetitors: number;
+  pct: number;
+  status: string;
+  divDetails: { name: string; color: string; scored: number; total: number }[];
+}) {
+  const [expanded, setExpanded] = useState(false);
+  const unscoredByDiv = expanded
+    ? divisions.map((div) => ({
+        div,
+        unscored: getUnscoredCompetitors(event.id, div.id),
+      }))
+    : [];
+  const totalUnscored = totalCompetitors - totalScored;
+
+  return (
+    <div className="card rounded-xl p-4 space-y-3">
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-2.5">
+          <div className="w-8 h-8 rounded-lg bg-surface-overlay border border-border-subtle flex items-center justify-center">
+            <EventIcon eventId={event.id} size={16} className="text-text-secondary" />
+          </div>
+          <div>
+            <h4 className="font-semibold text-text-primary text-sm">{event.name}</h4>
+            <p className="text-xs text-text-tertiary">
+              {totalScored} / {totalCompetitors} scored
+            </p>
+          </div>
+        </div>
+        <StatusBadge status={status} />
+      </div>
+
+      {/* Progress bar */}
+      <div className="h-1.5 rounded-full bg-surface-overlay overflow-hidden">
+        <div
+          className="h-full rounded-full transition-all duration-500"
+          style={{
+            width: `${pct}%`,
+            background: status === "complete" ? "#059848" : "#cc1a1a",
+          }}
+        />
+      </div>
+
+      {/* Per-division breakdown */}
+      <div className="flex gap-2">
+        {divDetails.map((d) => {
+          const dpct = d.total > 0 ? Math.round((d.scored / d.total) * 100) : 0;
+          return (
+            <div key={d.name} className="flex-1 text-center">
+              <div className="text-[10px] text-text-tertiary uppercase tracking-wider mb-1">
+                {d.name.slice(0, 3)}
+              </div>
+              <div className="h-1 rounded-full bg-surface-overlay overflow-hidden">
+                <div
+                  className="h-full rounded-full"
+                  style={{ width: `${dpct}%`, backgroundColor: d.color }}
+                />
+              </div>
+              <div className="text-[10px] text-text-tertiary mt-0.5 font-mono">{dpct}%</div>
+            </div>
+          );
+        })}
+      </div>
+
+      {/* Unscored toggle */}
+      {totalUnscored > 0 && (
+        <>
+          <button
+            onClick={() => setExpanded(!expanded)}
+            className="w-full flex items-center justify-between text-xs text-text-secondary hover:text-text-primary transition-colors pt-1"
+          >
+            <span className="font-medium">{totalUnscored} still need scores</span>
+            <ChevronDown
+              size={14}
+              className={`transition-transform duration-200 ${expanded ? "rotate-180" : ""}`}
+            />
+          </button>
+
+          {expanded && (
+            <div className="space-y-2 pt-1">
+              {unscoredByDiv.map(({ div, unscored }) => {
+                if (unscored.length === 0) return null;
+                return (
+                  <div key={div.id}>
+                    <div className="text-[10px] font-semibold uppercase tracking-wider mb-1" style={{ color: div.color }}>
+                      {div.name} ({unscored.length})
+                    </div>
+                    <div className="flex flex-wrap gap-1">
+                      {unscored.map((c) => (
+                        <span
+                          key={c.id}
+                          className="inline-flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded bg-surface-overlay border border-border-subtle"
+                        >
+                          <span className="font-mono font-bold" style={{ color: div.color }}>{c.bibNumber}</span>
+                          <span className="text-text-secondary">{c.firstName} {c.lastName.charAt(0)}.</span>
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </>
+      )}
     </div>
   );
 }

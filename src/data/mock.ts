@@ -273,6 +273,11 @@ export function getEventScoringProgress(eventId: string, divisionId: string): { 
   return { scored, total: divComps.length };
 }
 
+export function getUnscoredCompetitors(eventId: string, divisionId: string): Competitor[] {
+  const divComps = competitors.filter((c) => c.divisionId === divisionId && !c.scratch);
+  return divComps.filter((c) => !scores.some((s) => s.competitorId === c.id && s.eventId === eventId));
+}
+
 export function getEventLeader(eventId: string, divisionId: string): Standing | null {
   const divStandings = getDivisionStandings(divisionId);
   // Find who has the best raw score for this event
