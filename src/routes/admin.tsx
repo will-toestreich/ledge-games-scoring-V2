@@ -130,6 +130,7 @@ function CompetitorsTab() {
   const [regFilter, setRegFilter] = useState<string | null>(null); // "paid" | "cash" | "sponsor"
   const [paidFilter, setPaidFilter] = useState<boolean | null>(null);
   const [checkinFilter, setCheckinFilter] = useState<string | null>(null); // "ready" | "pending"
+  const [scratchFilter, setScratchFilter] = useState<boolean | null>(null);
   const [search, setSearch] = useState("");
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [checkedInOverrides, setCheckedInOverrides] = useState<Map<string, boolean>>(() => {
@@ -140,6 +141,11 @@ function CompetitorsTab() {
   const [paidOverrides, setPaidOverrides] = useState<Map<string, boolean>>(() => {
     const map = new Map<string, boolean>();
     competitors.forEach((c) => map.set(c.id, c.paid));
+    return map;
+  });
+  const [scratchOverrides, setScratchOverrides] = useState<Map<string, boolean>>(() => {
+    const map = new Map<string, boolean>();
+    competitors.forEach((c) => map.set(c.id, c.scratch));
     return map;
   });
 
@@ -167,6 +173,18 @@ function CompetitorsTab() {
     return paidOverrides.get(id) ?? false;
   }
 
+  function toggleScratch(id: string) {
+    setScratchOverrides((prev) => {
+      const next = new Map(prev);
+      next.set(id, !next.get(id));
+      return next;
+    });
+  }
+
+  function isScratch(id: string) {
+    return scratchOverrides.get(id) ?? false;
+  }
+
   const shirtSizes = [...new Set(competitors.map((c) => c.shirtSize).filter(Boolean))] as string[];
 
   const filteredCompetitors = competitors.filter((c) => {
@@ -178,6 +196,8 @@ function CompetitorsTab() {
     const cIn = isCheckedIn(c.id);
     if (checkinFilter === "ready" && !cIn) return false;
     if (checkinFilter === "pending" && cIn) return false;
+    if (scratchFilter === true && !isScratch(c.id)) return false;
+    if (scratchFilter === false && isScratch(c.id)) return false;
     if (search) {
       const q = search.toLowerCase();
       return (
@@ -347,6 +367,16 @@ function CompetitorsTab() {
           <FilterPill active={checkinFilter === "ready"} onClick={() => setCheckinFilter(checkinFilter === "ready" ? null : "ready")} activeColor="#059848">Yes</FilterPill>
           <FilterPill active={checkinFilter === "pending"} onClick={() => setCheckinFilter(checkinFilter === "pending" ? null : "pending")}>No</FilterPill>
         </div>
+
+        <div className="w-px h-5 bg-border-subtle" />
+
+        {/* Scratch */}
+        <div className="flex items-center gap-1.5">
+          <span className="text-[10px] text-text-tertiary uppercase tracking-wider font-medium mr-1">Scratch</span>
+          <FilterPill active={scratchFilter === null} onClick={() => setScratchFilter(null)}>All</FilterPill>
+          <FilterPill active={scratchFilter === true} onClick={() => setScratchFilter(scratchFilter === true ? null : true)} activeColor="#ef4444">Yes</FilterPill>
+          <FilterPill active={scratchFilter === false} onClick={() => setScratchFilter(scratchFilter === false ? null : false)} activeColor="#059848">No</FilterPill>
+        </div>
       </div>
 
       {/* Competitor table */}
@@ -364,6 +394,7 @@ function CompetitorsTab() {
               <col style={{ width: "80px" }} />   {/* Reg */}
               <col style={{ width: "60px" }} />   {/* Paid */}
               <col style={{ width: "70px" }} />   {/* Check-in */}
+              <col style={{ width: "64px" }} />   {/* Scratch */}
               <col style={{ width: "44px" }} />   {/* Edit */}
             </colgroup>
             <thead>
@@ -378,6 +409,7 @@ function CompetitorsTab() {
                 <th className="px-3 py-3 text-center text-text-tertiary font-medium text-xs uppercase tracking-wider">Reg</th>
                 <th className="px-3 py-3 text-center text-text-tertiary font-medium text-xs uppercase tracking-wider">Paid</th>
                 <th className="px-3 py-3 text-center text-text-tertiary font-medium text-xs uppercase tracking-wider">Check-in</th>
+                <th className="px-3 py-3 text-center text-text-tertiary font-medium text-xs uppercase tracking-wider">Scratch</th>
                 <th className="px-1 py-3"></th>
               </tr>
             </thead>
@@ -389,7 +421,7 @@ function CompetitorsTab() {
                     key={c.id}
                     className={`border-b border-border-subtle/50 transition-colors hover:bg-surface-overlay/50 ${
                       i % 2 === 0 ? "" : "bg-surface-raised/30"
-                    }`}
+                    } ${isScratch(c.id) ? "opacity-40" : ""}`}
                   >
                     <td className="px-3 py-2">
                       <span className="bib-badge text-[10px]" style={{ backgroundColor: div.color }}>
@@ -435,6 +467,18 @@ function CompetitorsTab() {
                         }`}
                       >
                         {isCheckedIn(c.id) && <CheckCircle2 size={12} />}
+                      </button>
+                    </td>
+                    <td className="px-3 py-2 text-center">
+                      <button
+                        onClick={() => toggleScratch(c.id)}
+                        className={`w-5 h-5 rounded border-2 flex items-center justify-center transition-all mx-auto ${
+                          isScratch(c.id)
+                            ? "bg-red-500 border-red-500 text-white"
+                            : "border-border-strong hover:border-text-secondary"
+                        }`}
+                      >
+                        {isScratch(c.id) && <CheckCircle2 size={12} />}
                       </button>
                     </td>
                     <td className="px-2 py-2 text-center">

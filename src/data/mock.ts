@@ -39,6 +39,7 @@ export interface Competitor {
   registration: "paid" | "cash" | "sponsor" | null;
   paid: boolean;
   checkedIn: boolean;
+  scratch: boolean;
   status: "active" | "withdrawn" | "disqualified";
 }
 
@@ -162,6 +163,7 @@ function generateCompetitors(
       registration,
       paid: registration !== null && Math.random() > 0.15,
       checkedIn,
+      scratch: Math.random() > 0.92,
       status: "active" as const,
     };
   });
