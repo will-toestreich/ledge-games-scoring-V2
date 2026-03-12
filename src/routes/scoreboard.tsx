@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect, useCallback } from "react";
+import { useState, useRef, useEffect } from "react";
 import { Link } from "@tanstack/react-router";
 import { Shield, Crosshair, Sun, Moon } from "lucide-react";
 import { useTheme } from "@/lib/theme";
@@ -428,7 +428,6 @@ function DivisionLeaderboard({
   standings: Standing[];
 }) {
   const scrollRef = useAutoScroll(0.3, 4000);
-  const round = getDivisionRound(div.id);
   const eventRanks = computeEventRanks(standings);
 
   // Sort by sum of event ranks (lowest = best, golf-style)

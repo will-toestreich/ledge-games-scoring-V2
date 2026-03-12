@@ -75,7 +75,7 @@ export function AdminPage() {
 function EventsTab() {
   return (
     <div className="grid gap-3">
-      {events.map((event, i) => (
+      {events.map((event) => (
         <div
           key={event.id}
           className="card card-interactive rounded-xl p-5 flex items-center gap-5 group"

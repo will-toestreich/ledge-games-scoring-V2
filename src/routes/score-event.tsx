@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Link, useParams } from "@tanstack/react-router";
 import { ChevronLeft } from "lucide-react";
-import { EventIcon } from "@/components/event-icons";
+
 import {
   divisions,
   getEvent,
