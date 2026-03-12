@@ -392,7 +392,7 @@ function StandingRow({ s, i, color, showEvents, eventRanks }: { s: Standing; i: 
       <span className={`truncate ${
         i === 0 ? "font-semibold" : i < 3 ? "text-text-primary font-medium" : "text-text-primary"
       }`} style={{ flex: showEvents ? "1.5 1 0" : "1 1 0", minWidth: 0, ...(i === 0 ? { color: "#FFD700" } : {}) }}>
-        {s.firstName} {s.lastName[0]}.
+        {s.firstName} {s.lastName}
       </span>
       {showEvents && events.map((e) => {
         const rank = eventRanks?.get(s.competitorId)?.[e.id];
@@ -552,7 +552,7 @@ function DivisionDetail({
         </div>
         <div className="ml-auto flex gap-6">
           <Metric label="Competitors" value={standings.length.toString()} />
-          <Metric label="Leader" value={standings[0]?.firstName ?? "—"} accent />
+          <Metric label="Leader" value={standings[0] ? `${standings[0].firstName} ${standings[0].lastName}` : "—"} accent />
           <Metric label="Top Score" value={standings[0]?.totalPoints.toString() ?? "—"} />
         </div>
       </div>
@@ -572,7 +572,7 @@ function DivisionDetail({
               const pts = s.eventPoints[event.id];
               if (pts && pts > bestScore) {
                 bestScore = pts;
-                bestName = `${s.firstName} ${s.lastName[0]}.`;
+                bestName = `${s.firstName} ${s.lastName}`;
               }
             }
 
