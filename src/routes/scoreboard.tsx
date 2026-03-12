@@ -482,11 +482,11 @@ function DivisionLeaderboard({
         <span style={{ width: "2em", marginRight: "0.3em", fontSize: "0.75em" }} className="shrink-0" />
         <span style={{ flex: "1.5 1 0", minWidth: 0 }} className="truncate">Name</span>
         {events.map((e) => (
-          <span key={e.id} style={{ flex: "1 1 0", minWidth: 0, fontSize: "0.85em", textAlign: "center" }}>
+          <span key={e.id} style={{ flex: "1 1 0", minWidth: 0, fontSize: "0.85em", textAlign: "center", display: "block" }}>
             {e.name.split(" ")[0].slice(0, 3)}
           </span>
         ))}
-        <span style={{ flex: "1 1 0", minWidth: 0, fontSize: "0.9em", textAlign: "center" }}>Tot</span>
+        <span style={{ flex: "1 1 0", minWidth: 0, fontSize: "0.9em", textAlign: "center", display: "block" }}>Tot</span>
       </div>
 
       {/* Pinned top 10 — always visible */}
