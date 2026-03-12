@@ -1,12 +1,10 @@
-import { useState } from "react";
+import { useState, useRef } from "react";
 import {
   Calendar,
   Users,
   Layers,
   Settings,
-  ChevronRight,
   KeyRound,
-  ClipboardCheck,
   Radar,
   UserPlus,
   Search,
@@ -16,6 +14,13 @@ import {
   Clock,
   Zap,
   Trophy,
+  ChevronDown,
+  Plus,
+  Trash2,
+  GripVertical,
+  Download,
+  Upload,
+  FileSpreadsheet,
 } from "lucide-react";
 import { EventIcon } from "@/components/event-icons";
 import {
@@ -30,14 +35,11 @@ import {
   getDivisionStandings,
 } from "@/data/mock";
 
-type Tab = "mission-control" | "events" | "competitors" | "registration" | "divisions" | "settings";
+type Tab = "mission-control" | "competitors" | "settings";
 
 const tabs: { key: Tab; label: string; count?: number; icon: React.ReactNode }[] = [
   { key: "mission-control", label: "Mission Control", icon: <Radar size={14} /> },
-  { key: "events", label: "Events", count: events.length, icon: <Calendar size={14} /> },
   { key: "competitors", label: "Competitors", count: competitors.length, icon: <Users size={14} /> },
-  { key: "registration", label: "Registration", icon: <ClipboardCheck size={14} /> },
-  { key: "divisions", label: "Divisions", count: divisions.length, icon: <Layers size={14} /> },
   { key: "settings", label: "Settings", icon: <Settings size={14} /> },
 ];
 
@@ -45,7 +47,7 @@ export function AdminPage() {
   const [activeTab, setActiveTab] = useState<Tab>("mission-control");
 
   return (
-    <div className="max-w-6xl mx-auto px-4 sm:px-6 py-8 animate-slide-up">
+    <div className="px-4 sm:px-6 lg:px-8 py-8 animate-slide-up">
       {/* Header */}
       <div className="mb-8">
         <div className="flex items-center gap-3 mb-1">
@@ -85,165 +87,234 @@ export function AdminPage() {
       {/* Tab content */}
       <div className="animate-fade-in">
         {activeTab === "mission-control" && <MissionControlTab />}
-        {activeTab === "events" && <EventsTab />}
         {activeTab === "competitors" && <CompetitorsTab />}
-        {activeTab === "registration" && <RegistrationTab />}
-        {activeTab === "divisions" && <DivisionsTab />}
         {activeTab === "settings" && <SettingsTab />}
       </div>
     </div>
   );
 }
 
-// ─── Events Tab ─────────────────────────────────────────
 
-function EventsTab() {
-  return (
-    <div className="grid gap-3">
-      {events.map((event) => (
-        <div
-          key={event.id}
-          className="card card-interactive rounded-xl p-5 flex items-center gap-5 group"
-        >
-          {/* Event icon */}
-          <div className="w-10 h-10 rounded-lg bg-surface-overlay border border-border-subtle flex items-center justify-center shrink-0">
-            <EventIcon eventId={event.id} size={20} className="text-text-secondary" />
-          </div>
-
-          <div className="flex-1 min-w-0">
-            <h3 className="font-semibold text-text-primary group-hover:text-white transition-colors">
-              {event.name}
-            </h3>
-            <div className="flex items-center gap-2 mt-1">
-              <span className="text-xs text-text-tertiary px-2 py-0.5 rounded-md bg-surface-overlay">
-                {event.scoringType}
-              </span>
-              <span className="text-xs text-text-tertiary">
-                {event.higherIsBetter ? "Higher wins" : "Lower wins"}
-              </span>
-              <span className="text-xs text-text-tertiary">&middot;</span>
-              <span className="text-xs text-text-tertiary">{event.rounds} rounds</span>
-            </div>
-          </div>
-
-          <ChevronRight size={16} className="text-text-tertiary group-hover:text-text-secondary transition-colors" />
-        </div>
-      ))}
-    </div>
-  );
-}
-
-// ─── Competitors Tab ────────────────────────────────────
+// ─── Competitors Tab (Registration Dashboard) ─────────────
 
 function CompetitorsTab() {
-  const [selectedDivision, setSelectedDivision] = useState(divisions[0].id);
-  const divCompetitors = getDivisionCompetitors(selectedDivision);
-  const activeDivision = divisions.find((d) => d.id === selectedDivision)!;
+  const [filter, setFilter] = useState<string | null>(null);
+  const [search, setSearch] = useState("");
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const filteredCompetitors = competitors.filter((c) => {
+    if (filter && c.divisionId !== filter) return false;
+    if (search) {
+      const q = search.toLowerCase();
+      return (
+        c.firstName.toLowerCase().includes(q) ||
+        c.lastName.toLowerCase().includes(q) ||
+        String(c.bibNumber).includes(q) ||
+        (c.email?.toLowerCase().includes(q) ?? false)
+      );
+    }
+    return true;
+  });
+
+  const totalCheckedIn = competitors.filter((c) => c.checkedIn).length;
+  const totalRegistered = competitors.filter((c) => c.registered).length;
+
+  function downloadTemplate() {
+    const headers = ["Bib", "First Name", "Last Name", "Email", "Division (mens/womens/mentors)", "Nickname", "Hometown", "Shirt Size"];
+    const csvContent = headers.join(",") + "\n";
+    const blob = new Blob([csvContent], { type: "text/csv" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "competitor-import-template.csv";
+    a.click();
+    URL.revokeObjectURL(url);
+  }
+
+  function handleCsvImport(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    // Phase 2: parse CSV and import competitors
+    console.log("CSV import:", file.name);
+    if (fileInputRef.current) fileInputRef.current.value = "";
+  }
 
   return (
-    <div>
-      {/* Division pills */}
-      <div className="flex gap-2 mb-5">
+    <div className="space-y-5">
+      {/* Headcount cards */}
+      <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+        <div className="card rounded-xl p-4">
+          <div className="text-xs text-text-tertiary font-medium uppercase tracking-wider mb-1">Total</div>
+          <div className="text-2xl font-bold text-text-primary">{competitors.length}</div>
+          <div className="text-xs text-text-secondary mt-0.5">competitors</div>
+        </div>
+        <div className="card rounded-xl p-4">
+          <div className="text-xs text-text-tertiary font-medium uppercase tracking-wider mb-1">Registered</div>
+          <div className="text-2xl font-bold text-text-primary">
+            {totalRegistered} <span className="text-sm font-normal text-text-tertiary">/ {competitors.length}</span>
+          </div>
+          <div className="h-1.5 rounded-full bg-surface-overlay overflow-hidden mt-2">
+            <div
+              className="h-full rounded-full bg-blue-500"
+              style={{ width: `${Math.round((totalRegistered / competitors.length) * 100)}%` }}
+            />
+          </div>
+        </div>
+        <div className="card rounded-xl p-4">
+          <div className="text-xs text-text-tertiary font-medium uppercase tracking-wider mb-1">Checked In</div>
+          <div className="text-2xl font-bold text-text-primary">
+            {totalCheckedIn} <span className="text-sm font-normal text-text-tertiary">/ {competitors.length}</span>
+          </div>
+          <div className="h-1.5 rounded-full bg-surface-overlay overflow-hidden mt-2">
+            <div
+              className="h-full rounded-full bg-emerald-500"
+              style={{ width: `${Math.round((totalCheckedIn / competitors.length) * 100)}%` }}
+            />
+          </div>
+        </div>
         {divisions.map((div) => {
-          const count = getDivisionCompetitors(div.id).length;
-          const isActive = selectedDivision === div.id;
+          const divComps = getDivisionCompetitors(div.id);
+          const divCheckedIn = divComps.filter((c) => c.checkedIn).length;
           return (
-            <button
-              key={div.id}
-              onClick={() => setSelectedDivision(div.id)}
-              className={`px-4 py-2 text-sm font-medium rounded-lg transition-all duration-200 ${
-                isActive
-                  ? "text-white shadow-lg"
-                  : "text-text-secondary bg-surface-raised border border-border-subtle hover:border-border-default hover:text-text-primary"
-              }`}
-              style={
-                isActive
-                  ? {
-                      backgroundColor: div.color,
-                      boxShadow: `0 4px 20px ${div.color}40`,
-                    }
-                  : undefined
-              }
-            >
-              {div.name}
-              <span className={`ml-1.5 text-xs ${isActive ? "opacity-70" : "text-text-tertiary"}`}>
-                {count}
-              </span>
-            </button>
+            <div key={div.id} className="card rounded-xl p-4" style={{ borderTop: `3px solid ${div.color}` }}>
+              <div className="text-xs text-text-tertiary font-medium uppercase tracking-wider mb-1">{div.name}</div>
+              <div className="text-2xl font-bold text-text-primary">
+                {divCheckedIn} <span className="text-sm font-normal text-text-tertiary">/ {divComps.length}</span>
+              </div>
+            </div>
           );
         })}
       </div>
 
+      {/* Search + filter + actions */}
+      <div className="flex items-center gap-3 flex-wrap">
+        <div className="relative flex-1 max-w-sm">
+          <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-text-tertiary" />
+          <input
+            type="text"
+            placeholder="Search by name, bib, or email..."
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className="input pl-9 py-2 text-sm"
+          />
+        </div>
+        <div className="flex gap-1.5">
+          <button
+            onClick={() => setFilter(null)}
+            className={`px-3 py-1.5 text-xs font-medium rounded-lg transition-all ${
+              !filter ? "bg-surface-overlay text-text-primary border border-border-default" : "text-text-secondary hover:text-text-primary"
+            }`}
+          >
+            All
+          </button>
+          {divisions.map((div) => (
+            <button
+              key={div.id}
+              onClick={() => setFilter(filter === div.id ? null : div.id)}
+              className={`px-3 py-1.5 text-xs font-medium rounded-lg transition-all ${
+                filter === div.id ? "text-white" : "text-text-secondary hover:text-text-primary"
+              }`}
+              style={filter === div.id ? { backgroundColor: div.color } : undefined}
+            >
+              {div.name}
+            </button>
+          ))}
+        </div>
+        <div className="flex gap-2 ml-auto">
+          <button onClick={downloadTemplate} className="btn-ghost text-xs py-1.5 inline-flex items-center gap-1.5">
+            <Download size={13} /> Template
+          </button>
+          <button onClick={() => fileInputRef.current?.click()} className="btn-secondary text-xs py-1.5 inline-flex items-center gap-1.5">
+            <Upload size={13} /> Import CSV
+          </button>
+          <input ref={fileInputRef} type="file" accept=".csv" onChange={handleCsvImport} className="hidden" />
+          <button className="btn-primary text-xs py-2 px-4 inline-flex items-center gap-1.5">
+            <UserPlus size={13} /> Add Walk-on
+          </button>
+        </div>
+      </div>
+
       {/* Competitor table */}
       <div className="card rounded-xl overflow-hidden">
-        <table className="w-full text-sm">
-          <thead>
-            <tr className="border-b border-border-subtle">
-              <th className="px-4 py-3 text-left text-text-tertiary font-medium text-xs uppercase tracking-wider w-16">Bib</th>
-              <th className="px-4 py-3 text-left text-text-tertiary font-medium text-xs uppercase tracking-wider">Name</th>
-              <th className="px-4 py-3 text-left text-text-tertiary font-medium text-xs uppercase tracking-wider">Hometown</th>
-              <th className="px-4 py-3 text-left text-text-tertiary font-medium text-xs uppercase tracking-wider w-24">Status</th>
-            </tr>
-          </thead>
-          <tbody>
-            {divCompetitors.map((c, i) => (
-              <tr
-                key={c.id}
-                className={`border-b border-border-subtle/50 transition-colors hover:bg-surface-overlay/50 ${
-                  i % 2 === 0 ? "" : "bg-surface-raised/30"
-                }`}
-              >
-                <td className="px-4 py-2.5">
-                  <span
-                    className="bib-badge"
-                    style={{ backgroundColor: activeDivision.color }}
-                  >
-                    {c.bibNumber}
-                  </span>
-                </td>
-                <td className="px-4 py-2.5 font-medium text-text-primary">
-                  {c.firstName} {c.lastName}
-                  {c.nickname && (
-                    <span className="text-text-tertiary ml-2 text-xs">{c.nickname}</span>
-                  )}
-                </td>
-                <td className="px-4 py-2.5 text-text-secondary">{c.hometown ?? "—"}</td>
-                <td className="px-4 py-2.5">
-                  <span className="badge badge-success">{c.status}</span>
-                </td>
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="border-b border-border-subtle">
+                <th className="px-3 py-3 text-left text-text-tertiary font-medium text-xs uppercase tracking-wider w-14">Bib</th>
+                <th className="px-3 py-3 text-left text-text-tertiary font-medium text-xs uppercase tracking-wider">Name</th>
+                <th className="px-3 py-3 text-left text-text-tertiary font-medium text-xs uppercase tracking-wider">Email</th>
+                <th className="px-3 py-3 text-left text-text-tertiary font-medium text-xs uppercase tracking-wider w-20">Division</th>
+                <th className="px-3 py-3 text-left text-text-tertiary font-medium text-xs uppercase tracking-wider w-20">Nickname</th>
+                <th className="px-3 py-3 text-left text-text-tertiary font-medium text-xs uppercase tracking-wider">Hometown</th>
+                <th className="px-3 py-3 text-center text-text-tertiary font-medium text-xs uppercase tracking-wider w-20">Shirt</th>
+                <th className="px-3 py-3 text-center text-text-tertiary font-medium text-xs uppercase tracking-wider w-16">Reg</th>
+                <th className="px-3 py-3 text-center text-text-tertiary font-medium text-xs uppercase tracking-wider w-24">Check-in</th>
               </tr>
-            ))}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {filteredCompetitors.map((c, i) => {
+                const div = divisions.find((d) => d.id === c.divisionId)!;
+                return (
+                  <tr
+                    key={c.id}
+                    className={`border-b border-border-subtle/50 transition-colors hover:bg-surface-overlay/50 ${
+                      i % 2 === 0 ? "" : "bg-surface-raised/30"
+                    }`}
+                  >
+                    <td className="px-3 py-2">
+                      <span className="bib-badge text-[10px]" style={{ backgroundColor: div.color }}>
+                        {c.bibNumber}
+                      </span>
+                    </td>
+                    <td className="px-3 py-2 font-medium text-text-primary whitespace-nowrap">
+                      {c.firstName} {c.lastName}
+                    </td>
+                    <td className="px-3 py-2 text-text-secondary text-xs truncate max-w-[180px]">{c.email ?? "—"}</td>
+                    <td className="px-3 py-2">
+                      <span className="text-xs font-medium" style={{ color: div.color }}>{div.name}</span>
+                    </td>
+                    <td className="px-3 py-2 text-text-tertiary text-xs">{c.nickname ?? "—"}</td>
+                    <td className="px-3 py-2 text-text-secondary text-xs">{c.hometown ?? "—"}</td>
+                    <td className="px-3 py-2 text-center text-text-secondary text-xs">{c.shirtSize ?? "—"}</td>
+                    <td className="px-3 py-2 text-center">
+                      {c.registered ? (
+                        <CheckCircle2 size={14} className="text-emerald-400 mx-auto" />
+                      ) : (
+                        <XCircle size={14} className="text-text-tertiary mx-auto" />
+                      )}
+                    </td>
+                    <td className="px-3 py-2 text-center">
+                      {c.checkedIn && c.waiverSigned ? (
+                        <span className="inline-flex items-center gap-1 text-[10px] font-medium text-emerald-400">
+                          <CheckCircle2 size={12} /> Ready
+                        </span>
+                      ) : c.checkedIn ? (
+                        <span className="inline-flex items-center gap-1 text-[10px] font-medium text-amber-400">
+                          <AlertTriangle size={12} /> No Waiver
+                        </span>
+                      ) : (
+                        <span className="inline-flex items-center gap-1 text-[10px] font-medium text-text-tertiary">
+                          <Clock size={12} /> Pending
+                        </span>
+                      )}
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+        <div className="px-4 py-2.5 border-t border-border-subtle flex items-center justify-between text-xs text-text-tertiary">
+          <span>{filteredCompetitors.length} competitor{filteredCompetitors.length !== 1 ? "s" : ""}</span>
+          <span className="inline-flex items-center gap-1.5">
+            <FileSpreadsheet size={12} /> CSV import available
+          </span>
+        </div>
       </div>
     </div>
   );
 }
 
-// ─── Divisions Tab ──────────────────────────────────────
-
-function DivisionsTab() {
-  return (
-    <div className="grid gap-3">
-      {divisions.map((div) => {
-        const count = getDivisionCompetitors(div.id).length;
-        return (
-          <div key={div.id} className="card rounded-xl p-5 flex items-center gap-4">
-            <div
-              className="w-3 h-12 rounded-full shrink-0"
-              style={{ backgroundColor: div.color, boxShadow: `0 0 12px ${div.color}50` }}
-            />
-            <div className="flex-1">
-              <h3 className="font-semibold text-text-primary">{div.name}</h3>
-              <p className="text-sm text-text-secondary">{count} competitors</p>
-            </div>
-            <span className="text-3xl font-bold text-text-tertiary font-mono">{count}</span>
-          </div>
-        );
-      })}
-    </div>
-  );
-}
 
 // ─── Settings Tab ───────────────────────────────────────
 
@@ -300,12 +371,48 @@ function SettingsField({
   );
 }
 
+function SettingsSection({
+  label,
+  icon,
+  count,
+  defaultOpen = false,
+  children,
+}: {
+  label: string;
+  icon: React.ReactNode;
+  count?: number;
+  defaultOpen?: boolean;
+  children: React.ReactNode;
+}) {
+  const [open, setOpen] = useState(defaultOpen);
+  return (
+    <div className="card rounded-xl overflow-hidden">
+      <button
+        onClick={() => setOpen(!open)}
+        className="w-full flex items-center gap-3 px-6 py-4 text-left hover:bg-surface-overlay/30 transition-colors"
+      >
+        <span className="text-text-tertiary">{icon}</span>
+        <span className="font-semibold text-text-primary flex-1">{label}</span>
+        {count !== undefined && (
+          <span className="text-xs text-text-tertiary font-mono bg-surface-overlay px-2 py-0.5 rounded-md">{count}</span>
+        )}
+        <ChevronDown
+          size={16}
+          className={`text-text-tertiary transition-transform duration-200 ${open ? "rotate-180" : ""}`}
+        />
+      </button>
+      {open && <div className="px-6 pb-5 pt-1 border-t border-border-subtle">{children}</div>}
+    </div>
+  );
+}
+
 function SettingsTab() {
   const [compName, setCompName] = useState(competition.name);
   const [pin, setPin] = useState("1234");
 
   return (
-    <div className="space-y-4 max-w-2xl">
+    <div className="space-y-4 max-w-4xl">
+      {/* General */}
       <SettingsField
         label="Competition Name"
         onSave={() => { /* Phase 2: persist to Supabase */ }}
@@ -331,6 +438,91 @@ function SettingsTab() {
           className="input w-48 font-mono text-xl tracking-[0.3em] text-center"
         />
       </SettingsField>
+
+      {/* Events Configuration */}
+      <SettingsSection
+        label="Events"
+        icon={<Calendar size={16} />}
+        count={events.length}
+      >
+        <div className="space-y-2 mt-3">
+          {events.map((event) => (
+            <div
+              key={event.id}
+              className="flex items-center gap-3 p-3 rounded-lg bg-surface-overlay/50 border border-border-subtle group"
+            >
+              <GripVertical size={14} className="text-text-tertiary opacity-0 group-hover:opacity-100 transition-opacity cursor-grab shrink-0" />
+              <div className="w-8 h-8 rounded-lg bg-surface border border-border-subtle flex items-center justify-center shrink-0">
+                <EventIcon eventId={event.id} size={16} className="text-text-secondary" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <div className="font-medium text-sm text-text-primary">{event.name}</div>
+                <div className="flex items-center gap-2 mt-0.5">
+                  <span className="text-[10px] text-text-tertiary px-1.5 py-0.5 rounded bg-surface border border-border-subtle">
+                    {event.scoringType}
+                  </span>
+                  <span className="text-[10px] text-text-tertiary">
+                    {event.higherIsBetter ? "Higher wins" : "Lower wins"}
+                  </span>
+                  <span className="text-[10px] text-text-tertiary">
+                    {event.rounds} rounds
+                  </span>
+                </div>
+              </div>
+              <button className="text-text-tertiary hover:text-red-400 opacity-0 group-hover:opacity-100 transition-all p-1.5 rounded-md hover:bg-red-500/10">
+                <Trash2 size={14} />
+              </button>
+            </div>
+          ))}
+          <button className="w-full flex items-center justify-center gap-2 py-2.5 rounded-lg border border-dashed border-border-default text-text-tertiary hover:text-text-primary hover:border-border-strong transition-colors text-sm">
+            <Plus size={14} /> Add Event
+          </button>
+        </div>
+      </SettingsSection>
+
+      {/* Divisions Configuration */}
+      <SettingsSection
+        label="Divisions"
+        icon={<Layers size={16} />}
+        count={divisions.length}
+      >
+        <div className="space-y-2 mt-3">
+          {divisions.map((div) => {
+            const count = getDivisionCompetitors(div.id).length;
+            return (
+              <div
+                key={div.id}
+                className="flex items-center gap-3 p-3 rounded-lg bg-surface-overlay/50 border border-border-subtle group"
+              >
+                <div
+                  className="w-3 h-8 rounded-full shrink-0"
+                  style={{ backgroundColor: div.color }}
+                />
+                <div className="flex-1 min-w-0">
+                  <div className="font-medium text-sm text-text-primary">{div.name}</div>
+                  <div className="text-[10px] text-text-tertiary mt-0.5">
+                    {count} competitors &middot; {div.slug}
+                  </div>
+                </div>
+                <div className="flex items-center gap-2">
+                  <input
+                    type="color"
+                    defaultValue={div.color}
+                    className="w-6 h-6 rounded cursor-pointer border-0 bg-transparent"
+                    title="Division color"
+                  />
+                  <button className="text-text-tertiary hover:text-red-400 opacity-0 group-hover:opacity-100 transition-all p-1.5 rounded-md hover:bg-red-500/10">
+                    <Trash2 size={14} />
+                  </button>
+                </div>
+              </div>
+            );
+          })}
+          <button className="w-full flex items-center justify-center gap-2 py-2.5 rounded-lg border border-dashed border-border-default text-text-tertiary hover:text-text-primary hover:border-border-strong transition-colors text-sm">
+            <Plus size={14} /> Add Division
+          </button>
+        </div>
+      </SettingsSection>
     </div>
   );
 }
@@ -551,187 +743,3 @@ function StatusBadge({ status }: { status: string }) {
   );
 }
 
-// ─── Registration Tab ──────────────────────────────────────
-
-function RegistrationTab() {
-  const [search, setSearch] = useState("");
-  const [filter, setFilter] = useState<string | null>(null);
-  const [checkedIn, setCheckedIn] = useState<Set<string>>(() => {
-    // Mock: about 80% checked in
-    const set = new Set<string>();
-    competitors.forEach((c, i) => {
-      if (i % 5 !== 0) set.add(c.id);
-    });
-    return set;
-  });
-
-  const filteredCompetitors = competitors.filter((c) => {
-    if (filter && c.divisionId !== filter) return false;
-    if (search) {
-      const q = search.toLowerCase();
-      return (
-        c.firstName.toLowerCase().includes(q) ||
-        c.lastName.toLowerCase().includes(q) ||
-        String(c.bibNumber).includes(q)
-      );
-    }
-    return true;
-  });
-
-  const totalCheckedIn = competitors.filter((c) => checkedIn.has(c.id)).length;
-
-  function toggleCheckIn(id: string) {
-    setCheckedIn((prev) => {
-      const next = new Set(prev);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
-      return next;
-    });
-  }
-
-  return (
-    <div className="space-y-5">
-      {/* Headcount cards */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-        <div className="card rounded-xl p-4">
-          <div className="text-xs text-text-tertiary font-medium uppercase tracking-wider mb-1">Total Check-ins</div>
-          <div className="text-2xl font-bold text-text-primary">
-            {totalCheckedIn} <span className="text-sm font-normal text-text-tertiary">/ {competitors.length}</span>
-          </div>
-          <div className="h-1.5 rounded-full bg-surface-overlay overflow-hidden mt-2">
-            <div
-              className="h-full rounded-full bg-emerald-500"
-              style={{ width: `${Math.round((totalCheckedIn / competitors.length) * 100)}%` }}
-            />
-          </div>
-        </div>
-        {divisions.map((div) => {
-          const divComps = getDivisionCompetitors(div.id);
-          const divCheckedIn = divComps.filter((c) => checkedIn.has(c.id)).length;
-          return (
-            <div key={div.id} className="card rounded-xl p-4" style={{ borderTop: `3px solid ${div.color}` }}>
-              <div className="text-xs text-text-tertiary font-medium uppercase tracking-wider mb-1">{div.name}</div>
-              <div className="text-2xl font-bold text-text-primary">
-                {divCheckedIn} <span className="text-sm font-normal text-text-tertiary">/ {divComps.length}</span>
-              </div>
-              <div className="h-1.5 rounded-full bg-surface-overlay overflow-hidden mt-2">
-                <div
-                  className="h-full rounded-full"
-                  style={{ width: `${Math.round((divCheckedIn / divComps.length) * 100)}%`, backgroundColor: div.color }}
-                />
-              </div>
-            </div>
-          );
-        })}
-      </div>
-
-      {/* Search + filter + add walk-on */}
-      <div className="flex items-center gap-3">
-        <div className="relative flex-1 max-w-sm">
-          <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-text-tertiary" />
-          <input
-            type="text"
-            placeholder="Search by name or bib..."
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            className="input pl-9 py-2 text-sm"
-          />
-        </div>
-        <div className="flex gap-1.5">
-          <button
-            onClick={() => setFilter(null)}
-            className={`px-3 py-1.5 text-xs font-medium rounded-lg transition-all ${
-              !filter ? "bg-surface-overlay text-text-primary border border-border-default" : "text-text-secondary hover:text-text-primary"
-            }`}
-          >
-            All
-          </button>
-          {divisions.map((div) => (
-            <button
-              key={div.id}
-              onClick={() => setFilter(filter === div.id ? null : div.id)}
-              className={`px-3 py-1.5 text-xs font-medium rounded-lg transition-all ${
-                filter === div.id ? "text-white" : "text-text-secondary hover:text-text-primary"
-              }`}
-              style={filter === div.id ? { backgroundColor: div.color } : undefined}
-            >
-              {div.name}
-            </button>
-          ))}
-        </div>
-        <button className="btn-secondary text-sm py-2 ml-auto inline-flex items-center gap-1.5">
-          <UserPlus size={14} /> Walk-on
-        </button>
-      </div>
-
-      {/* Registration table */}
-      <div className="card rounded-xl overflow-hidden">
-        <table className="w-full text-sm">
-          <thead>
-            <tr className="border-b border-border-subtle">
-              <th className="px-4 py-3 text-left text-text-tertiary font-medium text-xs uppercase tracking-wider w-12"></th>
-              <th className="px-4 py-3 text-left text-text-tertiary font-medium text-xs uppercase tracking-wider w-16">Bib</th>
-              <th className="px-4 py-3 text-left text-text-tertiary font-medium text-xs uppercase tracking-wider">Name</th>
-              <th className="px-4 py-3 text-left text-text-tertiary font-medium text-xs uppercase tracking-wider">Division</th>
-              <th className="px-4 py-3 text-left text-text-tertiary font-medium text-xs uppercase tracking-wider">Hometown</th>
-              <th className="px-4 py-3 text-center text-text-tertiary font-medium text-xs uppercase tracking-wider w-28">Status</th>
-            </tr>
-          </thead>
-          <tbody>
-            {filteredCompetitors.map((c, i) => {
-              const div = divisions.find((d) => d.id === c.divisionId)!;
-              const isIn = checkedIn.has(c.id);
-              return (
-                <tr
-                  key={c.id}
-                  className={`border-b border-border-subtle/50 transition-colors hover:bg-surface-overlay/50 ${
-                    i % 2 === 0 ? "" : "bg-surface-raised/30"
-                  }`}
-                >
-                  <td className="px-4 py-2">
-                    <button
-                      onClick={() => toggleCheckIn(c.id)}
-                      className={`w-6 h-6 rounded-md border-2 flex items-center justify-center transition-all ${
-                        isIn
-                          ? "bg-emerald-500 border-emerald-500 text-white"
-                          : "border-border-strong hover:border-text-secondary"
-                      }`}
-                    >
-                      {isIn && <CheckCircle2 size={14} />}
-                    </button>
-                  </td>
-                  <td className="px-4 py-2">
-                    <span className="bib-badge text-[10px]" style={{ backgroundColor: div.color }}>
-                      {c.bibNumber}
-                    </span>
-                  </td>
-                  <td className="px-4 py-2 font-medium text-text-primary">
-                    {c.firstName} {c.lastName}
-                    {c.nickname && <span className="text-text-tertiary ml-2 text-xs">{c.nickname}</span>}
-                  </td>
-                  <td className="px-4 py-2 text-text-secondary text-xs">{div.name}</td>
-                  <td className="px-4 py-2 text-text-secondary">{c.hometown ?? "—"}</td>
-                  <td className="px-4 py-2 text-center">
-                    {isIn ? (
-                      <span className="inline-flex items-center gap-1 text-xs font-medium text-emerald-400">
-                        <CheckCircle2 size={12} /> Checked In
-                      </span>
-                    ) : c.status === "withdrawn" ? (
-                      <span className="inline-flex items-center gap-1 text-xs font-medium text-red-400">
-                        <XCircle size={12} /> Withdrawn
-                      </span>
-                    ) : (
-                      <span className="inline-flex items-center gap-1 text-xs font-medium text-text-tertiary">
-                        <AlertTriangle size={12} /> Not Here
-                      </span>
-                    )}
-                  </td>
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
-      </div>
-    </div>
-  );
-}

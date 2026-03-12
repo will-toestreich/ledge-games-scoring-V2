@@ -34,6 +34,11 @@ export interface Competitor {
   lastName: string;
   nickname: string | null;
   hometown: string | null;
+  email: string | null;
+  shirtSize: string | null;
+  registered: boolean;
+  checkedIn: boolean;
+  waiverSigned: boolean;
   status: "active" | "withdrawn" | "disqualified";
 }
 
@@ -133,21 +138,32 @@ const hometowns = [
   "Park Falls, WI", "Hurley, WI", "Crandon, WI", null,
 ];
 
+const shirtSizes = ["S", "M", "L", "XL", "2XL", null];
+
 function generateCompetitors(
   firstNames: string[],
   divisionId: string,
   bibStart: number
 ): Competitor[] {
-  return firstNames.map((firstName, i) => ({
-    id: `${divisionId}-${i}`,
-    divisionId,
-    bibNumber: bibStart + i,
-    firstName,
-    lastName: lastNames[i % lastNames.length],
-    nickname: Math.random() > 0.7 ? `"The ${["Axe", "Bear", "Bull", "Stump", "Iron", "Timber", "Blaze", "Storm"][Math.floor(Math.random() * 8)]}"` : null,
-    hometown: hometowns[Math.floor(Math.random() * hometowns.length)],
-    status: "active" as const,
-  }));
+  return firstNames.map((firstName, i) => {
+    const registered = Math.random() > 0.05;
+    const checkedIn = registered && Math.random() > 0.2;
+    return {
+      id: `${divisionId}-${i}`,
+      divisionId,
+      bibNumber: bibStart + i,
+      firstName,
+      lastName: lastNames[i % lastNames.length],
+      nickname: Math.random() > 0.7 ? `"The ${["Axe", "Bear", "Bull", "Stump", "Iron", "Timber", "Blaze", "Storm"][Math.floor(Math.random() * 8)]}"` : null,
+      hometown: hometowns[Math.floor(Math.random() * hometowns.length)],
+      email: `${firstName.toLowerCase().replace(/\s+/g, "")}${lastNames[i % lastNames.length].toLowerCase()}@email.com`,
+      shirtSize: shirtSizes[Math.floor(Math.random() * shirtSizes.length)],
+      registered,
+      checkedIn,
+      waiverSigned: checkedIn && Math.random() > 0.1,
+      status: "active" as const,
+    };
+  });
 }
 
 export const competitors: Competitor[] = [
