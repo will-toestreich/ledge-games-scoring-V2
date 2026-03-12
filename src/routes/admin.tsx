@@ -95,15 +95,54 @@ export function AdminPage() {
 }
 
 
+function FilterPill({
+  active,
+  onClick,
+  activeColor,
+  children,
+}: {
+  active: boolean;
+  onClick: () => void;
+  activeColor?: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <button
+      onClick={onClick}
+      className={`px-3 py-1 text-xs font-medium rounded-full transition-all ${
+        active
+          ? activeColor
+            ? "text-white"
+            : "bg-surface-overlay text-text-primary border border-border-default"
+          : "text-text-secondary hover:text-text-primary border border-transparent"
+      }`}
+      style={active && activeColor ? { backgroundColor: activeColor } : undefined}
+    >
+      {children}
+    </button>
+  );
+}
+
 // ─── Competitors Tab (Registration Dashboard) ─────────────
 
 function CompetitorsTab() {
-  const [filter, setFilter] = useState<string | null>(null);
+  const [divisionFilter, setDivisionFilter] = useState<string | null>(null);
+  const [shirtFilter, setShirtFilter] = useState<string | null>(null);
+  const [regFilter, setRegFilter] = useState<boolean | null>(null);
+  const [checkinFilter, setCheckinFilter] = useState<string | null>(null); // "ready" | "no-waiver" | "pending"
   const [search, setSearch] = useState("");
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  const shirtSizes = [...new Set(competitors.map((c) => c.shirtSize).filter(Boolean))] as string[];
+
   const filteredCompetitors = competitors.filter((c) => {
-    if (filter && c.divisionId !== filter) return false;
+    if (divisionFilter && c.divisionId !== divisionFilter) return false;
+    if (shirtFilter && c.shirtSize !== shirtFilter) return false;
+    if (regFilter === true && !c.registered) return false;
+    if (regFilter === false && c.registered) return false;
+    if (checkinFilter === "ready" && !(c.checkedIn && c.waiverSigned)) return false;
+    if (checkinFilter === "no-waiver" && !(c.checkedIn && !c.waiverSigned)) return false;
+    if (checkinFilter === "pending" && c.checkedIn) return false;
     if (search) {
       const q = search.toLowerCase();
       return (
@@ -186,7 +225,7 @@ function CompetitorsTab() {
         })}
       </div>
 
-      {/* Search + filter + actions */}
+      {/* Search + actions */}
       <div className="flex items-center gap-3 flex-wrap">
         <div className="relative flex-1 max-w-sm">
           <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-text-tertiary" />
@@ -197,28 +236,6 @@ function CompetitorsTab() {
             onChange={(e) => setSearch(e.target.value)}
             className="input pl-9 py-2 text-sm"
           />
-        </div>
-        <div className="flex gap-1.5">
-          <button
-            onClick={() => setFilter(null)}
-            className={`px-3 py-1.5 text-xs font-medium rounded-lg transition-all ${
-              !filter ? "bg-surface-overlay text-text-primary border border-border-default" : "text-text-secondary hover:text-text-primary"
-            }`}
-          >
-            All
-          </button>
-          {divisions.map((div) => (
-            <button
-              key={div.id}
-              onClick={() => setFilter(filter === div.id ? null : div.id)}
-              className={`px-3 py-1.5 text-xs font-medium rounded-lg transition-all ${
-                filter === div.id ? "text-white" : "text-text-secondary hover:text-text-primary"
-              }`}
-              style={filter === div.id ? { backgroundColor: div.color } : undefined}
-            >
-              {div.name}
-            </button>
-          ))}
         </div>
         <div className="flex gap-2 ml-auto">
           <button onClick={downloadTemplate} className="btn-ghost text-xs py-1.5 inline-flex items-center gap-1.5">
@@ -231,6 +248,59 @@ function CompetitorsTab() {
           <button className="btn-primary text-xs py-2 px-4 inline-flex items-center gap-1.5">
             <UserPlus size={13} /> Add Walk-on
           </button>
+        </div>
+      </div>
+
+      {/* Filter pills */}
+      <div className="flex items-center gap-4 flex-wrap">
+        {/* Division */}
+        <div className="flex items-center gap-1.5">
+          <span className="text-[10px] text-text-tertiary uppercase tracking-wider font-medium mr-1">Division</span>
+          <FilterPill active={!divisionFilter} onClick={() => setDivisionFilter(null)}>All</FilterPill>
+          {divisions.map((div) => (
+            <FilterPill
+              key={div.id}
+              active={divisionFilter === div.id}
+              onClick={() => setDivisionFilter(divisionFilter === div.id ? null : div.id)}
+              activeColor={div.color}
+            >
+              {div.name}
+            </FilterPill>
+          ))}
+        </div>
+
+        <div className="w-px h-5 bg-border-subtle" />
+
+        {/* Shirt */}
+        <div className="flex items-center gap-1.5">
+          <span className="text-[10px] text-text-tertiary uppercase tracking-wider font-medium mr-1">Shirt</span>
+          <FilterPill active={!shirtFilter} onClick={() => setShirtFilter(null)}>All</FilterPill>
+          {shirtSizes.sort().map((size) => (
+            <FilterPill key={size} active={shirtFilter === size} onClick={() => setShirtFilter(shirtFilter === size ? null : size)}>
+              {size}
+            </FilterPill>
+          ))}
+        </div>
+
+        <div className="w-px h-5 bg-border-subtle" />
+
+        {/* Registration */}
+        <div className="flex items-center gap-1.5">
+          <span className="text-[10px] text-text-tertiary uppercase tracking-wider font-medium mr-1">Reg</span>
+          <FilterPill active={regFilter === null} onClick={() => setRegFilter(null)}>All</FilterPill>
+          <FilterPill active={regFilter === true} onClick={() => setRegFilter(regFilter === true ? null : true)} activeColor="#059848">Yes</FilterPill>
+          <FilterPill active={regFilter === false} onClick={() => setRegFilter(regFilter === false ? null : false)} activeColor="#ef4444">No</FilterPill>
+        </div>
+
+        <div className="w-px h-5 bg-border-subtle" />
+
+        {/* Check-in */}
+        <div className="flex items-center gap-1.5">
+          <span className="text-[10px] text-text-tertiary uppercase tracking-wider font-medium mr-1">Check-in</span>
+          <FilterPill active={!checkinFilter} onClick={() => setCheckinFilter(null)}>All</FilterPill>
+          <FilterPill active={checkinFilter === "ready"} onClick={() => setCheckinFilter(checkinFilter === "ready" ? null : "ready")} activeColor="#059848">Ready</FilterPill>
+          <FilterPill active={checkinFilter === "no-waiver"} onClick={() => setCheckinFilter(checkinFilter === "no-waiver" ? null : "no-waiver")} activeColor="#D97706">No Waiver</FilterPill>
+          <FilterPill active={checkinFilter === "pending"} onClick={() => setCheckinFilter(checkinFilter === "pending" ? null : "pending")}>Pending</FilterPill>
         </div>
       </div>
 
