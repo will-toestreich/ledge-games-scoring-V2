@@ -247,64 +247,90 @@ function DivisionsTab() {
 
 // ─── Settings Tab ───────────────────────────────────────
 
-function SettingsTab() {
-  const [compName, setCompName] = useState(competition.name);
-  const [pin, setPin] = useState("1234");
+function SettingsField({
+  label,
+  description,
+  icon,
+  children,
+  onSave,
+}: {
+  label: string;
+  description?: string;
+  icon?: React.ReactNode;
+  children: React.ReactNode;
+  onSave: () => void;
+}) {
   const [saved, setSaved] = useState(false);
 
   function handleSave() {
-    // In Phase 2 this will persist to Supabase
+    onSave();
     setSaved(true);
     setTimeout(() => setSaved(false), 2000);
   }
 
   return (
-    <div className="space-y-5 max-w-2xl">
-      <div className="card rounded-xl p-6 space-y-4">
-        <h3 className="font-semibold text-text-primary">Competition</h3>
+    <div className="card rounded-xl p-6 space-y-3">
+      <div className="flex items-center justify-between">
         <div>
-          <label className="text-text-secondary text-xs font-medium block mb-1.5">Name</label>
-          <input
-            type="text"
-            value={compName}
-            onChange={(e) => setCompName(e.target.value)}
-            className="input max-w-md"
-          />
+          <h3 className="font-semibold text-text-primary flex items-center gap-2">
+            {icon}
+            {label}
+          </h3>
+          {description && <p className="text-sm text-text-secondary mt-0.5">{description}</p>}
         </div>
+        <button
+          onClick={handleSave}
+          className={`text-xs font-medium px-3 py-1.5 rounded-lg transition-all ${
+            saved
+              ? "bg-emerald-500/15 text-emerald-400"
+              : "bg-surface-overlay text-text-secondary hover:text-text-primary border border-border-subtle hover:border-border-default"
+          }`}
+        >
+          {saved ? (
+            <span className="inline-flex items-center gap-1">
+              <CheckCircle2 size={12} /> Saved
+            </span>
+          ) : (
+            "Save"
+          )}
+        </button>
       </div>
+      {children}
+    </div>
+  );
+}
 
-      <div className="card rounded-xl p-6 space-y-3">
-        <h3 className="font-semibold text-text-primary flex items-center gap-2">
-          <KeyRound size={16} className="text-text-tertiary" />
-          Scorer PIN
-        </h3>
-        <p className="text-sm text-text-secondary">
-          Scorers enter this PIN on event day to access the scoring interface.
-        </p>
+function SettingsTab() {
+  const [compName, setCompName] = useState(competition.name);
+  const [pin, setPin] = useState("1234");
+
+  return (
+    <div className="space-y-4 max-w-2xl">
+      <SettingsField
+        label="Competition Name"
+        onSave={() => { /* Phase 2: persist to Supabase */ }}
+      >
+        <input
+          type="text"
+          value={compName}
+          onChange={(e) => setCompName(e.target.value)}
+          className="input max-w-md"
+        />
+      </SettingsField>
+
+      <SettingsField
+        label="Scorer PIN"
+        description="Scorers enter this PIN on event day to access the scoring interface."
+        icon={<KeyRound size={16} className="text-text-tertiary" />}
+        onSave={() => { /* Phase 2: persist to Supabase */ }}
+      >
         <input
           type="text"
           value={pin}
           onChange={(e) => setPin(e.target.value.replace(/\D/g, "").slice(0, 6))}
           className="input w-48 font-mono text-xl tracking-[0.3em] text-center"
         />
-      </div>
-
-      <div className="card rounded-xl p-6">
-        <h3 className="font-semibold text-text-primary mb-1">Field Size</h3>
-        <p className="text-sm text-text-secondary">
-          {competitors.length} total competitors across {divisions.length} divisions
-        </p>
-      </div>
-
-      <button onClick={handleSave} className="btn-primary">
-        {saved ? (
-          <span className="inline-flex items-center gap-2">
-            <CheckCircle2 size={16} /> Saved
-          </span>
-        ) : (
-          "Save Settings"
-        )}
-      </button>
+      </SettingsField>
     </div>
   );
 }
