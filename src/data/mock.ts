@@ -36,9 +36,9 @@ export interface Competitor {
   hometown: string | null;
   email: string | null;
   shirtSize: string | null;
-  registered: boolean;
+  registration: "paid" | "cash" | "sponsor" | null;
+  paid: boolean;
   checkedIn: boolean;
-  waiverSigned: boolean;
   status: "active" | "withdrawn" | "disqualified";
 }
 
@@ -146,8 +146,9 @@ function generateCompetitors(
   bibStart: number
 ): Competitor[] {
   return firstNames.map((firstName, i) => {
-    const registered = Math.random() > 0.05;
-    const checkedIn = registered && Math.random() > 0.2;
+    const regOptions: ("paid" | "cash" | "sponsor" | null)[] = ["paid", "paid", "paid", "cash", "cash", "sponsor", null];
+    const registration = regOptions[Math.floor(Math.random() * regOptions.length)];
+    const checkedIn = registration !== null && Math.random() > 0.2;
     return {
       id: `${divisionId}-${i}`,
       divisionId,
@@ -158,9 +159,9 @@ function generateCompetitors(
       hometown: hometowns[Math.floor(Math.random() * hometowns.length)],
       email: `${firstName.toLowerCase().replace(/\s+/g, "")}${lastNames[i % lastNames.length].toLowerCase()}@email.com`,
       shirtSize: shirtSizes[Math.floor(Math.random() * shirtSizes.length)],
-      registered,
+      registration,
+      paid: registration !== null && Math.random() > 0.15,
       checkedIn,
-      waiverSigned: checkedIn && Math.random() > 0.1,
       status: "active" as const,
     };
   });

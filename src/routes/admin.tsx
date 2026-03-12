@@ -9,8 +9,6 @@ import {
   UserPlus,
   Search,
   CheckCircle2,
-  XCircle,
-  AlertTriangle,
   Clock,
   Zap,
   Trophy,
@@ -21,6 +19,7 @@ import {
   Download,
   Upload,
   FileSpreadsheet,
+  Pencil,
 } from "lucide-react";
 import { EventIcon } from "@/components/event-icons";
 import {
@@ -128,21 +127,57 @@ function FilterPill({
 function CompetitorsTab() {
   const [divisionFilter, setDivisionFilter] = useState<string | null>(null);
   const [shirtFilter, setShirtFilter] = useState<string | null>(null);
-  const [regFilter, setRegFilter] = useState<boolean | null>(null);
-  const [checkinFilter, setCheckinFilter] = useState<string | null>(null); // "ready" | "no-waiver" | "pending"
+  const [regFilter, setRegFilter] = useState<string | null>(null); // "paid" | "cash" | "sponsor"
+  const [paidFilter, setPaidFilter] = useState<boolean | null>(null);
+  const [checkinFilter, setCheckinFilter] = useState<string | null>(null); // "ready" | "pending"
   const [search, setSearch] = useState("");
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const [checkedInOverrides, setCheckedInOverrides] = useState<Map<string, boolean>>(() => {
+    const map = new Map<string, boolean>();
+    competitors.forEach((c) => map.set(c.id, c.checkedIn));
+    return map;
+  });
+  const [paidOverrides, setPaidOverrides] = useState<Map<string, boolean>>(() => {
+    const map = new Map<string, boolean>();
+    competitors.forEach((c) => map.set(c.id, c.paid));
+    return map;
+  });
+
+  function toggleCheckIn(id: string) {
+    setCheckedInOverrides((prev) => {
+      const next = new Map(prev);
+      next.set(id, !next.get(id));
+      return next;
+    });
+  }
+
+  function togglePaid(id: string) {
+    setPaidOverrides((prev) => {
+      const next = new Map(prev);
+      next.set(id, !next.get(id));
+      return next;
+    });
+  }
+
+  function isCheckedIn(id: string) {
+    return checkedInOverrides.get(id) ?? false;
+  }
+
+  function isPaid(id: string) {
+    return paidOverrides.get(id) ?? false;
+  }
 
   const shirtSizes = [...new Set(competitors.map((c) => c.shirtSize).filter(Boolean))] as string[];
 
   const filteredCompetitors = competitors.filter((c) => {
     if (divisionFilter && c.divisionId !== divisionFilter) return false;
     if (shirtFilter && c.shirtSize !== shirtFilter) return false;
-    if (regFilter === true && !c.registered) return false;
-    if (regFilter === false && c.registered) return false;
-    if (checkinFilter === "ready" && !(c.checkedIn && c.waiverSigned)) return false;
-    if (checkinFilter === "no-waiver" && !(c.checkedIn && !c.waiverSigned)) return false;
-    if (checkinFilter === "pending" && c.checkedIn) return false;
+    if (regFilter && c.registration !== regFilter) return false;
+    if (paidFilter === true && !isPaid(c.id)) return false;
+    if (paidFilter === false && isPaid(c.id)) return false;
+    const cIn = isCheckedIn(c.id);
+    if (checkinFilter === "ready" && !cIn) return false;
+    if (checkinFilter === "pending" && cIn) return false;
     if (search) {
       const q = search.toLowerCase();
       return (
@@ -155,8 +190,8 @@ function CompetitorsTab() {
     return true;
   });
 
-  const totalCheckedIn = competitors.filter((c) => c.checkedIn).length;
-  const totalRegistered = competitors.filter((c) => c.registered).length;
+  const totalCheckedIn = competitors.filter((c) => isCheckedIn(c.id)).length;
+  const totalRegistered = competitors.filter((c) => c.registration !== null).length;
 
   function downloadTemplate() {
     const headers = ["Bib", "First Name", "Last Name", "Email", "Division (mens/womens/mentors)", "Nickname", "Hometown", "Shirt Size"];
@@ -213,7 +248,7 @@ function CompetitorsTab() {
         </div>
         {divisions.map((div) => {
           const divComps = getDivisionCompetitors(div.id);
-          const divCheckedIn = divComps.filter((c) => c.checkedIn).length;
+          const divCheckedIn = divComps.filter((c) => isCheckedIn(c.id)).length;
           return (
             <div key={div.id} className="card rounded-xl p-4" style={{ borderTop: `3px solid ${div.color}` }}>
               <div className="text-xs text-text-tertiary font-medium uppercase tracking-wider mb-1">{div.name}</div>
@@ -288,8 +323,19 @@ function CompetitorsTab() {
         <div className="flex items-center gap-1.5">
           <span className="text-[10px] text-text-tertiary uppercase tracking-wider font-medium mr-1">Reg</span>
           <FilterPill active={regFilter === null} onClick={() => setRegFilter(null)}>All</FilterPill>
-          <FilterPill active={regFilter === true} onClick={() => setRegFilter(regFilter === true ? null : true)} activeColor="#059848">Yes</FilterPill>
-          <FilterPill active={regFilter === false} onClick={() => setRegFilter(regFilter === false ? null : false)} activeColor="#ef4444">No</FilterPill>
+          <FilterPill active={regFilter === "paid"} onClick={() => setRegFilter(regFilter === "paid" ? null : "paid")}>Paid</FilterPill>
+          <FilterPill active={regFilter === "cash"} onClick={() => setRegFilter(regFilter === "cash" ? null : "cash")}>Cash</FilterPill>
+          <FilterPill active={regFilter === "sponsor"} onClick={() => setRegFilter(regFilter === "sponsor" ? null : "sponsor")}>Sponsor</FilterPill>
+        </div>
+
+        <div className="w-px h-5 bg-border-subtle" />
+
+        {/* Paid */}
+        <div className="flex items-center gap-1.5">
+          <span className="text-[10px] text-text-tertiary uppercase tracking-wider font-medium mr-1">Paid</span>
+          <FilterPill active={paidFilter === null} onClick={() => setPaidFilter(null)}>All</FilterPill>
+          <FilterPill active={paidFilter === true} onClick={() => setPaidFilter(paidFilter === true ? null : true)} activeColor="#059848">Yes</FilterPill>
+          <FilterPill active={paidFilter === false} onClick={() => setPaidFilter(paidFilter === false ? null : false)} activeColor="#ef4444">No</FilterPill>
         </div>
 
         <div className="w-px h-5 bg-border-subtle" />
@@ -298,27 +344,41 @@ function CompetitorsTab() {
         <div className="flex items-center gap-1.5">
           <span className="text-[10px] text-text-tertiary uppercase tracking-wider font-medium mr-1">Check-in</span>
           <FilterPill active={!checkinFilter} onClick={() => setCheckinFilter(null)}>All</FilterPill>
-          <FilterPill active={checkinFilter === "ready"} onClick={() => setCheckinFilter(checkinFilter === "ready" ? null : "ready")} activeColor="#059848">Ready</FilterPill>
-          <FilterPill active={checkinFilter === "no-waiver"} onClick={() => setCheckinFilter(checkinFilter === "no-waiver" ? null : "no-waiver")} activeColor="#D97706">No Waiver</FilterPill>
-          <FilterPill active={checkinFilter === "pending"} onClick={() => setCheckinFilter(checkinFilter === "pending" ? null : "pending")}>Pending</FilterPill>
+          <FilterPill active={checkinFilter === "ready"} onClick={() => setCheckinFilter(checkinFilter === "ready" ? null : "ready")} activeColor="#059848">Yes</FilterPill>
+          <FilterPill active={checkinFilter === "pending"} onClick={() => setCheckinFilter(checkinFilter === "pending" ? null : "pending")}>No</FilterPill>
         </div>
       </div>
 
       {/* Competitor table */}
       <div className="card rounded-xl overflow-hidden">
         <div className="overflow-x-auto">
-          <table className="w-full text-sm">
+          <table className="w-full text-sm table-fixed">
+            <colgroup>
+              <col style={{ width: "60px" }} />  {/* Bib */}
+              <col style={{ width: "14%" }} />    {/* Name */}
+              <col style={{ width: "18%" }} />    {/* Email */}
+              <col style={{ width: "8%" }} />     {/* Division */}
+              <col style={{ width: "10%" }} />    {/* Nickname */}
+              <col style={{ width: "12%" }} />    {/* Hometown */}
+              <col style={{ width: "70px" }} />   {/* Shirt */}
+              <col style={{ width: "80px" }} />   {/* Reg */}
+              <col style={{ width: "60px" }} />   {/* Paid */}
+              <col style={{ width: "70px" }} />   {/* Check-in */}
+              <col style={{ width: "44px" }} />   {/* Edit */}
+            </colgroup>
             <thead>
               <tr className="border-b border-border-subtle">
-                <th className="px-3 py-3 text-left text-text-tertiary font-medium text-xs uppercase tracking-wider w-14">Bib</th>
+                <th className="px-3 py-3 text-left text-text-tertiary font-medium text-xs uppercase tracking-wider">Bib</th>
                 <th className="px-3 py-3 text-left text-text-tertiary font-medium text-xs uppercase tracking-wider">Name</th>
                 <th className="px-3 py-3 text-left text-text-tertiary font-medium text-xs uppercase tracking-wider">Email</th>
-                <th className="px-3 py-3 text-left text-text-tertiary font-medium text-xs uppercase tracking-wider w-20">Division</th>
-                <th className="px-3 py-3 text-left text-text-tertiary font-medium text-xs uppercase tracking-wider w-20">Nickname</th>
+                <th className="px-3 py-3 text-left text-text-tertiary font-medium text-xs uppercase tracking-wider">Division</th>
+                <th className="px-3 py-3 text-left text-text-tertiary font-medium text-xs uppercase tracking-wider">Nickname</th>
                 <th className="px-3 py-3 text-left text-text-tertiary font-medium text-xs uppercase tracking-wider">Hometown</th>
-                <th className="px-3 py-3 text-center text-text-tertiary font-medium text-xs uppercase tracking-wider w-20">Shirt</th>
-                <th className="px-3 py-3 text-center text-text-tertiary font-medium text-xs uppercase tracking-wider w-16">Reg</th>
-                <th className="px-3 py-3 text-center text-text-tertiary font-medium text-xs uppercase tracking-wider w-24">Check-in</th>
+                <th className="px-3 py-3 text-center text-text-tertiary font-medium text-xs uppercase tracking-wider">Shirt</th>
+                <th className="px-3 py-3 text-center text-text-tertiary font-medium text-xs uppercase tracking-wider">Reg</th>
+                <th className="px-3 py-3 text-center text-text-tertiary font-medium text-xs uppercase tracking-wider">Paid</th>
+                <th className="px-3 py-3 text-center text-text-tertiary font-medium text-xs uppercase tracking-wider">Check-in</th>
+                <th className="px-1 py-3"></th>
               </tr>
             </thead>
             <tbody>
@@ -336,37 +396,54 @@ function CompetitorsTab() {
                         {c.bibNumber}
                       </span>
                     </td>
-                    <td className="px-3 py-2 font-medium text-text-primary whitespace-nowrap">
+                    <td className="px-3 py-2 font-medium text-text-primary whitespace-nowrap truncate">
                       {c.firstName} {c.lastName}
                     </td>
-                    <td className="px-3 py-2 text-text-secondary text-xs truncate max-w-[180px]">{c.email ?? "—"}</td>
+                    <td className="px-3 py-2 text-text-secondary text-xs truncate">{c.email ?? "—"}</td>
                     <td className="px-3 py-2">
                       <span className="text-xs font-medium" style={{ color: div.color }}>{div.name}</span>
                     </td>
-                    <td className="px-3 py-2 text-text-tertiary text-xs">{c.nickname ?? "—"}</td>
-                    <td className="px-3 py-2 text-text-secondary text-xs">{c.hometown ?? "—"}</td>
+                    <td className="px-3 py-2 text-text-tertiary text-xs truncate">{c.nickname ?? "—"}</td>
+                    <td className="px-3 py-2 text-text-secondary text-xs truncate">{c.hometown ?? "—"}</td>
                     <td className="px-3 py-2 text-center text-text-secondary text-xs">{c.shirtSize ?? "—"}</td>
                     <td className="px-3 py-2 text-center">
-                      {c.registered ? (
-                        <CheckCircle2 size={14} className="text-emerald-400 mx-auto" />
-                      ) : (
-                        <XCircle size={14} className="text-text-tertiary mx-auto" />
-                      )}
+                      <span className={`text-[10px] font-medium uppercase ${
+                        c.registration ? "text-text-primary" : "text-text-tertiary"
+                      }`}>
+                        {c.registration ?? "—"}
+                      </span>
                     </td>
                     <td className="px-3 py-2 text-center">
-                      {c.checkedIn && c.waiverSigned ? (
-                        <span className="inline-flex items-center gap-1 text-[10px] font-medium text-emerald-400">
-                          <CheckCircle2 size={12} /> Ready
-                        </span>
-                      ) : c.checkedIn ? (
-                        <span className="inline-flex items-center gap-1 text-[10px] font-medium text-amber-400">
-                          <AlertTriangle size={12} /> No Waiver
-                        </span>
-                      ) : (
-                        <span className="inline-flex items-center gap-1 text-[10px] font-medium text-text-tertiary">
-                          <Clock size={12} /> Pending
-                        </span>
-                      )}
+                      <button
+                        onClick={() => togglePaid(c.id)}
+                        className={`w-5 h-5 rounded border-2 flex items-center justify-center transition-all mx-auto ${
+                          isPaid(c.id)
+                            ? "bg-emerald-500 border-emerald-500 text-white"
+                            : "border-border-strong hover:border-text-secondary"
+                        }`}
+                      >
+                        {isPaid(c.id) && <CheckCircle2 size={12} />}
+                      </button>
+                    </td>
+                    <td className="px-3 py-2 text-center">
+                      <button
+                        onClick={() => toggleCheckIn(c.id)}
+                        className={`w-5 h-5 rounded border-2 flex items-center justify-center transition-all mx-auto ${
+                          isCheckedIn(c.id)
+                            ? "bg-emerald-500 border-emerald-500 text-white"
+                            : "border-border-strong hover:border-text-secondary"
+                        }`}
+                      >
+                        {isCheckedIn(c.id) && <CheckCircle2 size={12} />}
+                      </button>
+                    </td>
+                    <td className="px-2 py-2 text-center">
+                      <button
+                        className="p-1.5 rounded-md bg-surface-overlay border border-border-subtle text-text-secondary hover:text-text-primary hover:border-border-default transition-all"
+                        title="Edit competitor"
+                      >
+                        <Pencil size={13} />
+                      </button>
                     </td>
                   </tr>
                 );
