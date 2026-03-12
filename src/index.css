@@ -1,6 +1,8 @@
 @import "tailwindcss";
 
 @theme {
+  --font-mono: "Overpass Mono", ui-monospace, monospace;
+
   /* Brand primary */
   --color-ledge-red: #990000;
   --color-ledge-red-dark: #4C0000;

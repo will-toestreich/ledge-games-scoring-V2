@@ -33,6 +33,7 @@ import {
   getEventLeader,
   getTotalScoringProgress,
   getDivisionStandings,
+  getDivisionRound,
 } from "@/data/mock";
 
 type Tab = "mission-control" | "competitors" | "settings";
@@ -729,13 +730,13 @@ function MissionControlTab() {
   const eventStatuses = events.map((event) => {
     let totalScored = 0;
     let totalCompetitors = 0;
-    const divDetails: { name: string; color: string; scored: number; total: number }[] = [];
+    const divDetails: { name: string; divisionId: string; color: string; scored: number; total: number }[] = [];
 
     for (const div of divisions) {
       const p = getEventScoringProgress(event.id, div.id);
       totalScored += p.scored;
       totalCompetitors += p.total;
-      divDetails.push({ name: div.name, color: div.color, scored: p.scored, total: p.total });
+      divDetails.push({ name: div.name, divisionId: div.id, color: div.color, scored: p.scored, total: p.total });
     }
 
     const pct = totalCompetitors > 0 ? Math.round((totalScored / totalCompetitors) * 100) : 0;
@@ -860,7 +861,7 @@ function EventStatusCard({
   totalCompetitors: number;
   pct: number;
   status: string;
-  divDetails: { name: string; color: string; scored: number; total: number }[];
+  divDetails: { name: string; divisionId: string; color: string; scored: number; total: number }[];
 }) {
   const [expanded, setExpanded] = useState(false);
   const unscoredByDiv = expanded
@@ -903,6 +904,7 @@ function EventStatusCard({
       <div className="flex gap-2">
         {divDetails.map((d) => {
           const dpct = d.total > 0 ? Math.round((d.scored / d.total) * 100) : 0;
+          const round = getDivisionRound(d.divisionId);
           return (
             <div key={d.name} className="flex-1 text-center">
               <div className="text-[10px] text-text-tertiary uppercase tracking-wider mb-1">
@@ -915,6 +917,11 @@ function EventStatusCard({
                 />
               </div>
               <div className="text-[10px] text-text-tertiary mt-0.5 font-mono">{dpct}%</div>
+              {round && (
+                <div className="text-[9px] text-text-tertiary mt-0.5">
+                  Rd {round.currentRound}/{round.totalRounds}
+                </div>
+              )}
             </div>
           );
         })}
@@ -947,10 +954,11 @@ function EventStatusCard({
                       {unscored.map((c) => (
                         <span
                           key={c.id}
-                          className="inline-flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded bg-surface-overlay border border-border-subtle"
+                          className="inline-flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded text-white font-medium"
+                          style={{ backgroundColor: div.color }}
                         >
-                          <span className="font-mono font-bold" style={{ color: div.color }}>{c.bibNumber}</span>
-                          <span className="text-text-secondary">{c.firstName} {c.lastName.charAt(0)}.</span>
+                          <span className="font-mono font-bold">{c.bibNumber}</span>
+                          <span>{c.firstName} {c.lastName}</span>
                         </span>
                       ))}
                     </div>
