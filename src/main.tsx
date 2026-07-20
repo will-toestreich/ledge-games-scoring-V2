@@ -1,6 +1,17 @@
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 import { RouterProvider } from "@tanstack/react-router";
+import { registerSW } from "virtual:pwa-register";
+
+// Long-lived screens (the TV, scorers' phones) must pick up new deploys on
+// their own: check for an updated service worker every minute — autoUpdate
+// then swaps it in and reloads, no manual hard-refresh needed.
+registerSW({
+  immediate: true,
+  onRegisteredSW(_url, registration) {
+    if (registration) setInterval(() => registration.update(), 60_000);
+  },
+});
 import { QueryClientProvider } from "@tanstack/react-query";
 import "@fontsource/geist-sans/latin.css";
 import "@fontsource/overpass-mono/latin-400.css";
