@@ -510,9 +510,17 @@ export function eventProgress(res: EventResults): EventProgress {
   }
   const complete = allRoundsComplete;
   const pct = nRounds > 0 ? Math.round((fractions / nRounds) * 100) : 0;
+  // Detail = the current round's headcount ("4/75") — far more tangible on
+  // the board than a whole-event percentage
+  const r = Math.max(1, res.currentRound);
+  const currentEligible = res.eligibleByRound[r - 1] ?? [];
+  const currentDone = currentEligible.filter(
+    (id) => res.byCompetitor.get(id)?.roundComplete[r - 1]
+  ).length;
   return {
     pct: complete ? 100 : Math.min(pct, 99),
-    label: `Rd ${Math.max(1, res.currentRound)}/${nRounds}`,
+    label: `Rd ${r}/${nRounds}`,
+    detail: `${currentDone}/${currentEligible.length}`,
     complete,
     started: true,
   };

@@ -303,7 +303,7 @@ function EventStrip({ compact = false }: { compact?: boolean }) {
                     </div>
                     <span
                       className={`font-mono text-right shrink-0 ${isComplete ? "text-emerald-400" : "text-text-secondary"}`}
-                      style={{ fontSize: "clamp(7px, 0.45vw, 10px)", width: "clamp(20px, 2.2vw, 34px)" }}
+                      style={{ fontSize: "clamp(7px, 0.45vw, 10px)", width: "clamp(26px, 2.6vw, 44px)" }}
                     >
                       {p.detail ?? `${p.pct}%`}
                     </span>
