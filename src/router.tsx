@@ -31,7 +31,7 @@ function RootLayout() {
       {/* Glass nav bar — hidden on scoreboard for full-screen display */}
       {!isScoreboard && (
         <nav className="glass sticky top-0 z-50 border-b border-border-subtle">
-          <div className="px-4 sm:px-6 lg:px-8 flex items-center h-14 gap-8">
+          <div className="px-3 sm:px-6 lg:px-8 flex items-center h-14 gap-3 sm:gap-8">
             <Link to="/" className="flex items-center gap-3 shrink-0">
               <img
                 src={`${import.meta.env.BASE_URL}brand/The-Ledge-Games-Logo-4.png`}
@@ -73,14 +73,15 @@ function NavPill({
   return (
     <Link
       to={to}
-      className={`relative px-4 py-1.5 rounded-full text-sm font-medium transition-all duration-200 inline-flex items-center gap-1.5 ${
+      className={`relative px-3 sm:px-4 py-1.5 rounded-full text-sm font-medium transition-all duration-200 inline-flex items-center gap-1.5 ${
         active
           ? "text-white bg-ledge-red shadow-[0_0_16px_rgba(153,0,0,0.3)]"
           : "text-text-secondary hover:text-text-primary hover:bg-white/[0.04]"
       }`}
     >
       {icon}
-      {children}
+      {/* Icon-only on phones — three labeled pills don't fit beside the logo */}
+      <span className="hidden sm:inline">{children}</span>
     </Link>
   );
 }
@@ -156,7 +157,7 @@ function LandingPage() {
           <p className="text-text-tertiary text-sm">Pick your weapon.</p>
         </div>
 
-        <div className="flex gap-4 justify-center">
+        <div className="flex gap-3 sm:gap-4 justify-center flex-wrap px-4">
           <Link to="/admin" className="btn-secondary text-base px-8 py-3 inline-flex items-center gap-2">
             <Shield size={18} />
             Admin

@@ -98,7 +98,7 @@ export function AdminPage() {
         </p>
       </div>
 
-      <div className="flex gap-1 mb-8 p-1 rounded-xl bg-surface-raised border border-border-subtle w-fit">
+      <div className="flex gap-1 mb-8 p-1 rounded-xl bg-surface-raised border border-border-subtle w-fit max-w-full flex-wrap">
         {tabs.map((tab) => (
           <button
             key={tab.key}
@@ -1740,9 +1740,9 @@ function MissionControlTab() {
               </div>
             )}
             {chaseView.map(({ competitor: c, division: d, items }) => (
-              <div key={c.id} className="flex items-center gap-3 px-4 py-2">
+              <div key={c.id} className="flex items-center gap-2 sm:gap-3 px-3 sm:px-4 py-2 flex-wrap">
                 <span className="bib-badge text-[10px]" style={{ backgroundColor: d.color }}>{c.bibNumber}</span>
-                <span className="font-medium text-sm text-text-primary w-44 truncate">
+                <span className="font-medium text-sm text-text-primary w-28 sm:w-44 truncate">
                   {c.firstName} {c.lastName}
                 </span>
                 <div className="flex flex-wrap gap-1.5 flex-1">

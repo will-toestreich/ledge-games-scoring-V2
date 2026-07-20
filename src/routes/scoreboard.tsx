@@ -21,6 +21,26 @@ function ScoreboardThemeToggle() {
   );
 }
 
+// ─── Responsive mode ──────────────────────────────────────
+
+/**
+ * The scoreboard has two audiences: the TV (fixed full-screen grid, rows
+ * sized to fill, auto-scroll) and phones/tablets via the public URL
+ * (stacked boards, natural height, normal page scrolling).
+ */
+function useIsCompact(): boolean {
+  const [compact, setCompact] = useState(
+    () => typeof window !== "undefined" && window.matchMedia("(max-width: 900px)").matches
+  );
+  useEffect(() => {
+    const mq = window.matchMedia("(max-width: 900px)");
+    const onChange = (e: MediaQueryListEvent) => setCompact(e.matches);
+    mq.addEventListener("change", onChange);
+    return () => mq.removeEventListener("change", onChange);
+  }, []);
+  return compact;
+}
+
 // ─── Page ─────────────────────────────────────────────────
 
 type View = "overview" | DivisionId;
@@ -31,14 +51,15 @@ export function ScoreboardPage() {
   const { data: activeComp } = useActiveCompetition();
   const isLive = activeComp?.status === "active";
   const activeDivisions = useActiveDivisions();
+  const compact = useIsCompact();
   // A disabled division can't be viewed (e.g. Mentors toggled off mid-view)
   const effectiveView: View =
     view !== "overview" && !activeDivisions.some((d) => d.id === view) ? "overview" : view;
 
   return (
-    <div className="h-screen flex flex-col bg-surface-base overflow-hidden">
+    <div className={`bg-surface-base ${compact ? "min-h-screen flex flex-col" : "h-screen flex flex-col overflow-hidden"}`}>
       <div
-        className="shrink-0 flex items-center gap-1 border-b border-border-subtle relative"
+        className="shrink-0 flex items-center gap-1 flex-wrap border-b border-border-subtle relative"
         style={{ padding: "clamp(4px, 0.4vh, 8px) clamp(12px, 1vw, 20px)" }}
       >
         <span className="font-semibold text-text-primary" style={{ fontSize: "clamp(10px, 0.6vw, 13px)", marginRight: "clamp(4px, 0.4vw, 8px)" }}>
@@ -56,7 +77,8 @@ export function ScoreboardPage() {
           />
         ))}
 
-        <Link to="/" className="absolute left-1/2 -translate-x-1/2 flex items-center justify-center">
+        {/* Centered logo overlaps the wrapped tab row on small screens */}
+        <Link to="/" className="absolute left-1/2 -translate-x-1/2 hidden lg:flex items-center justify-center">
           <img src={`${import.meta.env.BASE_URL}brand/The-Ledge-Games-Logo-4.png`} alt="The Ledge Games" style={{ height: "clamp(20px, 2.5vh, 32px)" }} />
         </Link>
 
@@ -86,8 +108,12 @@ export function ScoreboardPage() {
         </div>
       </div>
 
-      <div className="flex-1 min-h-0 overflow-hidden">
-        {effectiveView === "overview" ? <OverviewDashboard /> : <DivisionDetail divisionId={effectiveView} />}
+      <div className={compact ? "flex-1" : "flex-1 min-h-0 overflow-hidden"}>
+        {effectiveView === "overview" ? (
+          <OverviewDashboard compact={compact} />
+        ) : (
+          <DivisionDetail divisionId={effectiveView} />
+        )}
       </div>
     </div>
   );
@@ -181,10 +207,23 @@ function useAutoScroll(speed = 0.5, pauseMs = 3000) {
 
 // ─── Overview ─────────────────────────────────────────────
 
-function OverviewDashboard() {
+function OverviewDashboard({ compact }: { compact: boolean }) {
   const activeDivisions = useActiveDivisions();
   const mens = activeDivisions.find((d) => d.id === "mens");
   const sideDivisions = activeDivisions.filter((d) => d.id !== "mens");
+
+  if (compact) {
+    // Phones/tablets: every board stacked full-width at natural height,
+    // fixed readable rows, event columns dropped — the page scrolls
+    return (
+      <div className="flex flex-col gap-3 p-3 animate-fade-in">
+        <EventStrip compact />
+        {activeDivisions.map((div) => (
+          <DivisionLeaderboard key={div.id} division={div} mobile />
+        ))}
+      </div>
+    );
+  }
 
   return (
     <div className="flex flex-col h-full animate-fade-in" style={{ padding: "clamp(8px, 1vh, 20px) clamp(12px, 1.5vw, 20px)" }}>
@@ -209,7 +248,7 @@ function OverviewDashboard() {
   );
 }
 
-function EventStrip() {
+function EventStrip({ compact = false }: { compact?: boolean }) {
   const scoring = {
     mens: useDivisionScoring("mens"),
     womens: useDivisionScoring("womens"),
@@ -219,8 +258,8 @@ function EventStrip() {
   const allEvents = [...new Set(activeDivisions.flatMap((d) => divisionEvents(d.id).map((e) => e.id)))];
 
   return (
-    <div className="shrink-0" style={{ marginBottom: "clamp(8px, 1vh, 20px)" }}>
-      <div className="grid grid-cols-6" style={{ gap: "clamp(6px, 0.5vw, 12px)" }}>
+    <div className="shrink-0" style={compact ? undefined : { marginBottom: "clamp(8px, 1vh, 20px)" }}>
+      <div className={compact ? "grid grid-cols-2 sm:grid-cols-3 gap-2" : "grid grid-cols-6"} style={compact ? undefined : { gap: "clamp(6px, 0.5vw, 12px)" }}>
         {allEvents.map((eventId) => (
           <div key={eventId} className="card rounded-lg" style={{ padding: "clamp(6px, 0.6vw, 16px)" }}>
             <div className="flex items-center mb-1" style={{ gap: "clamp(4px, 0.4vw, 10px)" }}>
@@ -392,10 +431,13 @@ function ColumnHeaders({ events }: { events: { id: EventId; name: string }[] }) 
 function DivisionLeaderboard({
   division: div,
   split = false,
+  mobile = false,
 }: {
   division: Division;
   /** Render the standings in two side-by-side halves (large fields). */
   split?: boolean;
+  /** Phone layout: natural height, fixed readable rows, no event columns. */
+  mobile?: boolean;
 }) {
   const scrollRef = useAutoScroll(0.3, 4000);
   const scrollRefB = useAutoScroll(0.3, 4000);
@@ -427,10 +469,13 @@ function DivisionLeaderboard({
   const half = Math.ceil(rows.length / 2);
   const halves = [rows.slice(0, half), rows.slice(half)];
   const rowCount = split ? half : rows.length;
-  const rowHeight =
-    rowsAreaH > 0 && rowCount > 0
+  const rowHeight = mobile
+    ? 30 // fixed, readable on a phone; the page scrolls instead
+    : rowsAreaH > 0 && rowCount > 0
       ? Math.max(14, Math.min(44, Math.floor(rowsAreaH / rowCount)))
       : undefined;
+  // Per-event rank columns don't fit a phone — rank/bib/name/total only
+  const shownEvents = mobile ? [] : events;
 
   return (
     <div
@@ -439,7 +484,7 @@ function DivisionLeaderboard({
         // Split boards fill their grid cell; stacked boards share the side
         // column proportionally to their row counts (basis ≈ header block)
         // so per-row heights come out roughly equal across boards.
-        ...(split ? { width: "100%" } : { flex: `${rows.length} 1 3.5rem` }),
+        ...(mobile ? {} : split ? { width: "100%" } : { flex: `${rows.length} 1 3.5rem` }),
         minHeight: 0,
         background: `linear-gradient(180deg, ${div.color}12 0%, ${div.color}08 100%)`,
       }}
@@ -462,7 +507,16 @@ function DivisionLeaderboard({
         </span>
       </div>
 
-      {split ? (
+      {mobile ? (
+        <>
+          <ColumnHeaders events={shownEvents} />
+          <div style={{ padding: "2px 6px 4px" }}>
+            {rows.map(({ s, name }, i) => (
+              <StandingRow key={s.competitorId} s={s} i={i} color={div.color} events={shownEvents} name={name} rowHeight={rowHeight} />
+            ))}
+          </div>
+        </>
+      ) : split ? (
         /* Two side-by-side halves, each with its own headers; whole field visible */
         <div className="flex-1 min-h-0 flex" style={{ gap: "clamp(4px, 0.4vw, 12px)", padding: "clamp(2px, 0.2vh, 4px) clamp(3px, 0.3vw, 8px)" }}>
           {halves.map((hrows, hi) => (
@@ -533,13 +587,13 @@ function DivisionDetail({ divisionId }: { divisionId: DivisionId }) {
   const leader = data.standings[0] && byId.get(data.standings[0].competitorId);
 
   return (
-    <div className="p-5 space-y-5 animate-fade-in overflow-y-auto h-full">
-      <div className="flex items-center gap-6">
+    <div className="p-3 sm:p-5 space-y-5 animate-fade-in overflow-y-auto h-full">
+      <div className="flex items-center gap-4 sm:gap-6 flex-wrap">
         <div className="flex items-center gap-3">
           <span className="w-4 h-4 rounded-full" style={{ backgroundColor: div.color, boxShadow: `0 0 12px ${div.color}60` }} />
           <h2 className="text-xl font-bold text-text-primary">{div.name}</h2>
         </div>
-        <div className="ml-auto flex gap-6">
+        <div className="ml-auto flex gap-4 sm:gap-6 flex-wrap">
           <Metric label="Competitors" value={String(data.field.length)} />
           <Metric label="Leader" value={leader ? `${leader.firstName} ${leader.lastName}` : "—"} accent />
           <Metric label="Total Points" value={data.standings[0] ? String(data.standings[0].total) : "—"} />
@@ -556,7 +610,7 @@ function DivisionDetail({ divisionId }: { divisionId: DivisionId }) {
       {/* Event cards */}
       <div>
         <h3 className="section-label mb-3">Event Breakdown</h3>
-        <div className="grid gap-3" style={{ gridTemplateColumns: `repeat(${events.length}, minmax(0, 1fr))` }}>
+        <div className="grid gap-3 grid-cols-2 sm:grid-cols-3 xl:grid-cols-6">
           {events.map((event) => {
             const res = data.eventResults.get(event.id)!;
             const p = eventProgress(res);
@@ -596,7 +650,8 @@ function DivisionDetail({ divisionId }: { divisionId: DivisionId }) {
       <div>
         <h3 className="section-label mb-3">Full Standings</h3>
         <div className="card rounded-xl overflow-hidden">
-          <table className="w-full text-sm">
+          <div className="overflow-x-auto">
+          <table className="w-full text-sm min-w-[560px]">
             <thead>
               <tr className="border-b border-border-subtle">
                 <th className="px-4 py-2.5 text-left text-text-tertiary font-medium text-[10px] uppercase tracking-wider w-12">Rank</th>
@@ -652,6 +707,7 @@ function DivisionDetail({ divisionId }: { divisionId: DivisionId }) {
               })}
             </tbody>
           </table>
+          </div>
         </div>
       </div>
     </div>

@@ -43,7 +43,7 @@ export function Modal({ title, onClose, children }: { title: string; onClose: ()
 
 function Field({ label, children, span2 }: { label: string; children: React.ReactNode; span2?: boolean }) {
   return (
-    <label className={`flex flex-col gap-1 ${span2 ? "col-span-2" : ""}`}>
+    <label className={`flex flex-col gap-1 ${span2 ? "sm:col-span-2" : ""}`}>
       <span className="text-[11px] text-text-tertiary uppercase tracking-wider font-medium">{label}</span>
       {children}
     </label>
@@ -146,7 +146,7 @@ export function CompetitorFormModal({
 
   return (
     <Modal title={editing ? `Edit ${competitor.firstName} ${competitor.lastName}` : "Add Walk-on"} onClose={onClose}>
-      <div className="grid grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <Field label="Division" span2>
           <div className="flex gap-2">
             {divisionOptions.map((d) => (
