@@ -120,7 +120,7 @@ html[data-theme="light"] {
 
   body {
     @apply text-text-primary antialiased;
-    font-family: "Geist", "Inter Variable", "Inter", system-ui, -apple-system, sans-serif;
+    font-family: "Geist", system-ui, -apple-system, sans-serif;
     background: var(--color-surface-base);
     overflow-x: hidden;
   }

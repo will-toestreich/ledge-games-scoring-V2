@@ -7,15 +7,14 @@ import {
   Hammer,
   type LucideProps,
 } from "lucide-react";
-import type { Event } from "@/data/mock";
 
 const iconMap: Record<string, React.ComponentType<LucideProps>> = {
-  "evt-axe": Axe,
-  "evt-keg": Beer,
-  "evt-caber": TreePine,
-  "evt-archery": Target,
-  "evt-chop": Timer,
-  "evt-hammer": Hammer,
+  axe: Axe,
+  keg: Beer,
+  caber: TreePine,
+  archery: Target,
+  chop: Timer,
+  hammer: Hammer,
 };
 
 export function EventIcon({
@@ -30,8 +29,4 @@ export function EventIcon({
   const Icon = iconMap[eventId];
   if (!Icon) return null;
   return <Icon size={size} strokeWidth={1.5} className={className} />;
-}
-
-export function getEventIcon(event: Event) {
-  return <EventIcon eventId={event.id} />;
 }

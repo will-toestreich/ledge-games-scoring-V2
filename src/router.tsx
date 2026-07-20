@@ -8,6 +8,7 @@ import {
 } from "@tanstack/react-router";
 import { Shield, Crosshair, BarChart3, Sun, Moon } from "lucide-react";
 import { useTheme } from "./lib/theme";
+import { useDbSync } from "./data/hooks";
 import { AdminPage } from "./routes/admin";
 import { ScorePage } from "./routes/score";
 import { ScoreEventPage } from "./routes/score-event";
@@ -17,6 +18,7 @@ import { ScoreboardPage } from "./routes/scoreboard";
 // ─── Root layout ──────────────────────────────────────────
 
 function RootLayout() {
+  useDbSync();
   const matchRoute = useMatchRoute();
   const isHome = matchRoute({ to: "/" });
   const isAdmin = matchRoute({ to: "/admin", fuzzy: true });
@@ -175,6 +177,10 @@ const scoreCompetitorRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/score/$eventId/$competitorId",
   component: ScoreCompetitorPage,
+  validateSearch: (search: Record<string, unknown>): { round?: number } => {
+    const round = Number(search.round);
+    return Number.isInteger(round) && round >= 1 ? { round } : {};
+  },
 });
 
 const scoreboardRoute = createRoute({
