@@ -81,7 +81,7 @@ for (const row of rosterRows.slice(1)) {
     lastName: rest.join(" "),
     nickname: (row[8] ?? "").trim() || null,
     hometown: (row[9] ?? "").trim() || null,
-    email: (row[3] ?? "").trim() || null,
+    email: null, // archive data ships in the public bundle — emails redacted
     shirtSize: shirtMap[(row[4] ?? "").trim()] ?? null,
     registration,
     paid: registration !== null,

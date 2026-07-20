@@ -57,7 +57,7 @@ export function ScoreboardPage() {
         ))}
 
         <Link to="/" className="absolute left-1/2 -translate-x-1/2 flex items-center justify-center">
-          <img src="/brand/The-Ledge-Games-Logo-4.png" alt="The Ledge Games" style={{ height: "clamp(20px, 2.5vh, 32px)" }} />
+          <img src={`${import.meta.env.BASE_URL}brand/The-Ledge-Games-Logo-4.png`} alt="The Ledge Games" style={{ height: "clamp(20px, 2.5vh, 32px)" }} />
         </Link>
 
         <div className="ml-auto flex items-center" style={{ gap: "clamp(6px, 0.6vw, 12px)" }}>

@@ -1,7 +1,7 @@
 // TanStack Query data layer. Components talk to these hooks only —
 // never to db.ts directly — so the Supabase swap stays invisible.
 
-import { useEffect, useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   QueryClient,
   useMutation,
@@ -32,6 +32,17 @@ export function useDbSync() {
     window.addEventListener(db.DB_UPDATED_EVENT, onUpdate);
     return () => window.removeEventListener(db.DB_UPDATED_EVENT, onUpdate);
   }, [qc]);
+}
+
+/** Writes queued offline, waiting to sync (cloud adapter only). */
+export function useOutboxCount(): number {
+  const [count, setCount] = useState(() => db.getPendingWrites());
+  useEffect(() => {
+    const update = () => setCount(db.getPendingWrites());
+    window.addEventListener(db.OUTBOX_UPDATED_EVENT, update);
+    return () => window.removeEventListener(db.OUTBOX_UPDATED_EVENT, update);
+  }, []);
+  return count;
 }
 
 // ─── Reads ─────────────────────────────────────────────────

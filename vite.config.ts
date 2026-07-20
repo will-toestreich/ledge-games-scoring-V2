@@ -5,6 +5,8 @@ import { VitePWA } from "vite-plugin-pwa";
 import { resolve } from "path";
 
 export default defineConfig({
+  // GitHub Pages serves from /<repo>/ — CI sets VITE_BASE accordingly
+  base: process.env.VITE_BASE ?? "/",
   plugins: [
     react(),
     tailwindcss(),
@@ -22,7 +24,8 @@ export default defineConfig({
         display: "standalone",
         icons: [
           {
-            src: "/brand/The-Ledge-Games-Icon-1.png",
+            // Relative so it resolves under the deploy base path
+            src: "brand/The-Ledge-Games-Icon-1.png",
             sizes: "512x512",
             type: "image/png",
             purpose: "any maskable",

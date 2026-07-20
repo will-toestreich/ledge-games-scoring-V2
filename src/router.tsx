@@ -6,9 +6,9 @@ import {
   Link,
   useMatchRoute,
 } from "@tanstack/react-router";
-import { Shield, Crosshair, BarChart3, Sun, Moon } from "lucide-react";
+import { Shield, Crosshair, BarChart3, Sun, Moon, CloudUpload } from "lucide-react";
 import { useTheme } from "./lib/theme";
-import { useDbSync } from "./data/hooks";
+import { useCompetitors, useDbSync, useOutboxCount } from "./data/hooks";
 import { AdminPage } from "./routes/admin";
 import { ScorePage } from "./routes/score";
 import { ScoreEventPage } from "./routes/score-event";
@@ -27,19 +27,21 @@ function RootLayout() {
 
   return (
     <div className="min-h-screen flex flex-col bg-surface-base">
+      <DataErrorBanner />
       {/* Glass nav bar — hidden on scoreboard for full-screen display */}
       {!isScoreboard && (
         <nav className="glass sticky top-0 z-50 border-b border-border-subtle">
           <div className="px-4 sm:px-6 lg:px-8 flex items-center h-14 gap-8">
             <Link to="/" className="flex items-center gap-3 shrink-0">
               <img
-                src="/brand/The-Ledge-Games-Logo-4.png"
+                src={`${import.meta.env.BASE_URL}brand/The-Ledge-Games-Logo-4.png`}
                 alt="The Ledge Games"
                 className="h-7"
               />
             </Link>
 
             <div className="flex items-center gap-1 ml-auto">
+              <OutboxBadge />
               <NavPill to="/admin" active={!!isAdmin} icon={<Shield size={14} />}>Admin</NavPill>
               <NavPill to="/score" active={!!isScore} icon={<Crosshair size={14} />}>Scoring</NavPill>
               <NavPill to="/scoreboard" active={!!isScoreboard} icon={<BarChart3 size={14} />}>Scoreboard</NavPill>
@@ -83,6 +85,34 @@ function NavPill({
   );
 }
 
+function DataErrorBanner() {
+  const { error } = useCompetitors();
+  if (!error) return null;
+  const msg = error instanceof Error ? error.message : String(error);
+  const schemaMissing = /could not find the table|schema cache/i.test(msg);
+  return (
+    <div className="bg-red-500/10 border-b border-red-500/30 text-red-400 text-xs px-4 py-2 text-center">
+      {schemaMissing
+        ? "Cloud database not initialized — run supabase/migrations/001_init.sql in the Supabase SQL Editor, then reload."
+        : `Data error: ${msg}`}
+    </div>
+  );
+}
+
+function OutboxBadge() {
+  const pending = useOutboxCount();
+  if (pending === 0) return null;
+  return (
+    <span
+      className="inline-flex items-center gap-1.5 text-xs font-medium px-3 py-1 rounded-full bg-amber-500/15 text-amber-400 border border-amber-500/30 mr-1"
+      title="Scores saved on this device that haven't reached the cloud yet — they'll sync automatically when the connection returns"
+    >
+      <CloudUpload size={13} />
+      {pending} queued
+    </span>
+  );
+}
+
 function ThemeToggle() {
   const { theme, toggle } = useTheme();
   return (
@@ -114,7 +144,7 @@ function LandingPage() {
       <div className="relative text-center space-y-10 px-4 animate-slide-up">
         {/* Stacked logo */}
         <img
-          src="/brand/The-Ledge-Games-Logo-4.png"
+          src={`${import.meta.env.BASE_URL}brand/The-Ledge-Games-Logo-4.png`}
           alt="The Ledge Games"
           className="h-48 mx-auto drop-shadow-2xl"
         />
@@ -198,7 +228,7 @@ const routeTree = rootRoute.addChildren([
   scoreboardRoute,
 ]);
 
-export const router = createRouter({ routeTree });
+export const router = createRouter({ routeTree, basepath: import.meta.env.BASE_URL });
 
 declare module "@tanstack/react-router" {
   interface Register {
