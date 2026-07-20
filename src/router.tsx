@@ -8,7 +8,7 @@ import {
 } from "@tanstack/react-router";
 import { Shield, Crosshair, BarChart3, Sun, Moon, CloudUpload } from "lucide-react";
 import { useTheme } from "./lib/theme";
-import { useCompetitors, useDbSync, useOutboxCount } from "./data/hooks";
+import { useCompetitors, useDbSync, useOutboxCount, useSettings } from "./data/hooks";
 import { AdminPage } from "./routes/admin";
 import { ScorePage } from "./routes/score";
 import { ScoreEventPage } from "./routes/score-event";
@@ -130,6 +130,7 @@ function ThemeToggle() {
 // ─── Landing page ─────────────────────────────────────────
 
 function LandingPage() {
+  const { data: settings } = useSettings();
   return (
     <div className="relative flex items-center justify-center min-h-[calc(100vh-3.5rem)] overflow-hidden">
       {/* Ambient background glow */}
@@ -142,31 +143,41 @@ function LandingPage() {
         style={{ background: "rgba(10, 67, 102, 0.08)" }}
       />
 
-      <div className="relative text-center space-y-10 px-4 animate-slide-up">
-        {/* Stacked logo */}
+      <div className="relative text-center space-y-8 sm:space-y-10 px-6 animate-slide-up w-full">
+        {/* Stacked logo — scaled to the screen, never edge-to-edge */}
         <img
           src={`${import.meta.env.BASE_URL}brand/The-Ledge-Games-Logo-4.png`}
           alt="The Ledge Games"
-          className="h-48 mx-auto drop-shadow-2xl"
+          className="h-auto w-full max-w-[300px] sm:max-w-[420px] md:max-w-[520px] mx-auto drop-shadow-2xl"
         />
 
-        <div className="space-y-3">
+        <div className="space-y-2 sm:space-y-3">
           <p className="text-text-secondary text-lg tracking-wide">
-            2026 Competition Scoring
+            {settings ? `${settings.year} Competition Scoring` : "Competition Scoring"}
           </p>
           <p className="text-text-tertiary text-sm">Pick your weapon.</p>
         </div>
 
-        <div className="flex gap-3 sm:gap-4 justify-center flex-wrap px-4">
-          <Link to="/admin" className="btn-secondary text-base px-8 py-3 inline-flex items-center gap-2">
-            <Shield size={18} />
-            Admin
-          </Link>
-          <Link to="/score" className="btn-primary text-base px-8 py-3 inline-flex items-center gap-2">
+        {/* Phones: one clean full-width stack, primary action first */}
+        <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 justify-center items-stretch sm:items-center max-w-xs sm:max-w-none mx-auto">
+          <Link
+            to="/score"
+            className="btn-primary text-base px-8 py-3 inline-flex items-center justify-center gap-2 sm:order-2"
+          >
             <Crosshair size={18} />
             Start Scoring
           </Link>
-          <Link to="/scoreboard" className="btn-secondary text-base px-8 py-3 inline-flex items-center gap-2">
+          <Link
+            to="/admin"
+            className="btn-secondary text-base px-8 py-3 inline-flex items-center justify-center gap-2 sm:order-1"
+          >
+            <Shield size={18} />
+            Admin
+          </Link>
+          <Link
+            to="/scoreboard"
+            className="btn-secondary text-base px-8 py-3 inline-flex items-center justify-center gap-2 sm:order-3"
+          >
             <BarChart3 size={18} />
             Scoreboard
           </Link>
