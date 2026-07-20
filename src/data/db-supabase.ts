@@ -409,12 +409,10 @@ export async function renameCompetition(id: string, name: string): Promise<void>
 export async function deleteCompetition(id: string): Promise<void> {
   const all = await fetchCompetitions();
   if (all.length <= 1) throw new Error("Can't delete the only competition");
+  const target = all.find((c) => c.id === id);
+  if (target?.isActive) throw new Error("Can't delete the active season — switch to another season first");
+  if (target?.status === "active") throw new Error("Can't delete a live season — archive it by starting a new one first");
   fail((await sb().from("v2_competitions").delete().eq("id", id)).error);
-  const activeId = await getActiveId();
-  if (activeId === id) {
-    const remaining = all.filter((c) => c.id !== id);
-    await sb().from("v2_app_state").update({ active_competition_id: remaining[0].id }).eq("id", 1);
-  }
   activeIdCache = null;
   emitUpdated();
 }

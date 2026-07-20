@@ -221,8 +221,10 @@ export async function activateCompetition(id: string): Promise<void> {
 export async function deleteCompetition(id: string): Promise<void> {
   const db = load();
   if (db.competitions.length <= 1) throw new Error("Can't delete the only competition");
+  if (db.activeId === id) throw new Error("Can't delete the active season — switch to another season first");
+  const target = db.competitions.find((c) => c.id === id);
+  if (target?.status === "active") throw new Error("Can't delete a live season — archive it by starting a new one first");
   db.competitions = db.competitions.filter((c) => c.id !== id);
-  if (db.activeId === id) db.activeId = db.competitions[db.competitions.length - 1].id;
   persist();
 }
 

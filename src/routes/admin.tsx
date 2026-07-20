@@ -1390,7 +1390,9 @@ function SeasonsSection() {
                 Make Active
               </button>
             )}
-            {competitions.length > 1 && (
+            {/* An active season can't be deleted — neither the one being
+                viewed nor a live (non-archived) competition */}
+            {!c.isActive && c.status !== "active" && competitions.length > 1 && (
               <button
                 onClick={() => {
                   if (confirmDeleteId !== c.id) {
