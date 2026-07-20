@@ -393,7 +393,7 @@ function CompetitorsTab() {
 
       {/* Filters */}
       <div className="flex items-center gap-4 flex-wrap">
-        <div className="flex items-center gap-1.5">
+        <div className="flex items-center gap-1.5 flex-wrap">
           <span className="text-[10px] text-text-tertiary uppercase tracking-wider font-medium mr-1">Division</span>
           <FilterPill active={!divisionFilter} onClick={() => setDivisionFilter(null)}>All</FilterPill>
           {divisions.map((div) => (
@@ -408,7 +408,7 @@ function CompetitorsTab() {
           ))}
         </div>
         <div className="w-px h-5 bg-border-subtle" />
-        <div className="flex items-center gap-1.5">
+        <div className="flex items-center gap-1.5 flex-wrap">
           <span className="text-[10px] text-text-tertiary uppercase tracking-wider font-medium mr-1">Reg</span>
           <FilterPill active={regFilter === null} onClick={() => setRegFilter(null)}>All</FilterPill>
           {["paid", "cash", "sponsor"].map((r) => (
@@ -418,7 +418,7 @@ function CompetitorsTab() {
           ))}
         </div>
         <div className="w-px h-5 bg-border-subtle" />
-        <div className="flex items-center gap-1.5">
+        <div className="flex items-center gap-1.5 flex-wrap">
           <span className="text-[10px] text-text-tertiary uppercase tracking-wider font-medium mr-1">Shirt</span>
           <FilterPill active={!shirtFilter} onClick={() => setShirtFilter(null)}>All</FilterPill>
           {SHIRT_SIZES.map((size) => (
@@ -428,21 +428,21 @@ function CompetitorsTab() {
           ))}
         </div>
         <div className="w-px h-5 bg-border-subtle" />
-        <div className="flex items-center gap-1.5">
+        <div className="flex items-center gap-1.5 flex-wrap">
           <span className="text-[10px] text-text-tertiary uppercase tracking-wider font-medium mr-1">Paid</span>
           <FilterPill active={paidFilter === null} onClick={() => setPaidFilter(null)}>All</FilterPill>
           <FilterPill active={paidFilter === true} onClick={() => setPaidFilter(paidFilter === true ? null : true)} activeColor="#059848">Yes</FilterPill>
           <FilterPill active={paidFilter === false} onClick={() => setPaidFilter(paidFilter === false ? null : false)} activeColor="#ef4444">No</FilterPill>
         </div>
         <div className="w-px h-5 bg-border-subtle" />
-        <div className="flex items-center gap-1.5">
+        <div className="flex items-center gap-1.5 flex-wrap">
           <span className="text-[10px] text-text-tertiary uppercase tracking-wider font-medium mr-1">Check-in</span>
           <FilterPill active={!checkinFilter} onClick={() => setCheckinFilter(null)}>All</FilterPill>
           <FilterPill active={checkinFilter === "ready"} onClick={() => setCheckinFilter(checkinFilter === "ready" ? null : "ready")} activeColor="#059848">Yes</FilterPill>
           <FilterPill active={checkinFilter === "pending"} onClick={() => setCheckinFilter(checkinFilter === "pending" ? null : "pending")}>No</FilterPill>
         </div>
         <div className="w-px h-5 bg-border-subtle" />
-        <div className="flex items-center gap-1.5">
+        <div className="flex items-center gap-1.5 flex-wrap">
           <span className="text-[10px] text-text-tertiary uppercase tracking-wider font-medium mr-1">No-show</span>
           <FilterPill active={noShowFilter === null} onClick={() => setNoShowFilter(null)}>All</FilterPill>
           <FilterPill active={noShowFilter === true} onClick={() => setNoShowFilter(noShowFilter === true ? null : true)} activeColor="#ef4444">Yes</FilterPill>
@@ -1701,7 +1701,7 @@ function MissionControlTab() {
             Needs to Score <span className="text-text-tertiary normal-case">— most blocking first</span>
           </h3>
           <div className="flex items-center gap-4 flex-wrap mb-3">
-            <div className="flex items-center gap-1.5">
+            <div className="flex items-center gap-1.5 flex-wrap">
               <span className="text-[10px] text-text-tertiary uppercase tracking-wider font-medium mr-1">Division</span>
               <FilterPill active={!effectiveChaseDiv} onClick={() => setChaseDiv(null)}>All</FilterPill>
               {activeDivisions.map((d) => (
@@ -1716,7 +1716,7 @@ function MissionControlTab() {
               ))}
             </div>
             <div className="w-px h-5 bg-border-subtle" />
-            <div className="flex items-center gap-1.5">
+            <div className="flex items-center gap-1.5 flex-wrap">
               <span className="text-[10px] text-text-tertiary uppercase tracking-wider font-medium mr-1">Event</span>
               <FilterPill active={!chaseEvent} onClick={() => setChaseEvent(null)}>All</FilterPill>
               {events.map((e) => (
@@ -1901,7 +1901,7 @@ function EventStatusCard({
             </p>
           </div>
         </div>
-        <div className="flex items-center gap-1.5">
+        <div className="flex items-center gap-1.5 flex-wrap">
           <PaceChip pace={pace} />
           <StatusBadge status={allDone && anyStarted ? "complete" : anyStarted ? "in-progress" : "not-started"} />
         </div>
