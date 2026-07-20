@@ -1254,7 +1254,7 @@ function SettingsTab() {
 // ─── Seasons ──────────────────────────────────────────────
 
 function SeasonsSection() {
-  const { data: competitions } = useCompetitions();
+  const { data: competitions, error } = useCompetitions();
   const create = useCreateCompetition();
   const activate = useActivateCompetition();
   const rename = useRenameCompetition();
@@ -1272,6 +1272,14 @@ function SeasonsSection() {
     setRenamingId(null);
   }
 
+  // Never vanish silently — a failed seasons query must be visible
+  if (error) {
+    return (
+      <div className="card rounded-xl p-6 text-sm text-red-400">
+        Couldn't load seasons: {error instanceof Error ? error.message : String(error)}
+      </div>
+    );
+  }
   if (!competitions) return null;
   const yearNum = Number(newYear);
   const canCreate = newName.trim() !== "" && Number.isInteger(yearNum) && yearNum >= 2000;

@@ -344,7 +344,7 @@ export async function fetchCompetitions(): Promise<CompetitionMeta[]> {
   const activeId = await getActiveId();
   const { data, error } = await sb()
     .from("v2_competitions")
-    .select("id, status, name, year, competitors(count)")
+    .select("id, status, name, year, v2_competitors(count)")
     .order("year", { ascending: false });
   fail(error);
   return (data ?? []).map((r) => ({
@@ -352,7 +352,7 @@ export async function fetchCompetitions(): Promise<CompetitionMeta[]> {
     name: r.name as string,
     year: r.year as number,
     status: r.status as CompetitionStatus,
-    competitorCount: (r.competitors as unknown as { count: number }[])[0]?.count ?? 0,
+    competitorCount: (r.v2_competitors as unknown as { count: number }[])[0]?.count ?? 0,
     isActive: r.id === activeId,
   }));
 }
