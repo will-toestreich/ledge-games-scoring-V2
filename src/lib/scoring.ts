@@ -198,12 +198,21 @@ function computeRoundsEvent(
     return n;
   };
 
-  // Advancement: everyone contends round 1; apply cuts (ties all advance)
+  // Advancement: everyone contends round 1. A cut only LOCKS once its round
+  // is fully scored — computing cuts from partial data would cascade the few
+  // scored competitors straight into a phantom "finals" and (via the finals
+  // reset) tie them all at rank 1 while round 1 is still being thrown.
   const eligibleByRound: string[][] = [contenders.map((c) => c.id)];
+  const appliedCuts: boolean[] = []; // index r-1: cut after round r executed
   for (let r = 1; r < nRounds; r++) {
     const cut = division.cutsAfterRound[r];
     const current = eligibleByRound[r - 1];
-    if (cut === undefined) {
+    const roundDone =
+      started &&
+      current.length > 0 &&
+      current.every((id) => roundCompleteById.get(id)![r - 1]);
+    if (cut === undefined || !roundDone) {
+      appliedCuts.push(false);
       eligibleByRound.push([...current]);
       continue;
     }
@@ -217,7 +226,15 @@ function computeRoundsEvent(
     const ranks = assignGolfRanks(entries);
     // One tie, all tie: everyone ranked within the target advances
     eligibleByRound.push(current.filter((id) => ranks.get(id)! <= target));
+    appliedCuts.push(true);
   }
+
+  // Finals ranking (score reset) only kicks in once the finals cut has
+  // actually happened — until then everyone ranks on cumulative.
+  const lastCutRound = Object.keys(division.cutsAfterRound)
+    .map(Number)
+    .reduce((m, r) => Math.max(m, r), 0);
+  const finalsLocked = hasCuts && lastCutRound > 0 && appliedCuts[lastCutRound - 1] === true;
 
   const eligibleThrough = new Map<string, number>();
   for (const c of contenders) eligibleThrough.set(c.id, 1);
@@ -230,7 +247,7 @@ function computeRoundsEvent(
   // otherwise. Pending competitors (zero attempts) sink via completeness 0.
   const entries: RankEntry[] = contenders.map((c) => {
     const through = eligibleThrough.get(c.id)!;
-    const isFinalist = hasCuts && through === nRounds;
+    const isFinalist = finalsLocked && through === nRounds;
     if (isFinalist && plan.finalsReset) {
       const finals = roundScoresById.get(c.id)![nRounds - 1];
       return {
@@ -268,7 +285,7 @@ function computeRoundsEvent(
     }
     const rs = roundScoresById.get(c.id)!;
     const through = eligibleThrough.get(c.id)!;
-    const isFinalist = hasCuts && through === nRounds;
+    const isFinalist = finalsLocked && through === nRounds;
     const participated = rs.some((v) => v !== null);
     return {
       competitorId: c.id,

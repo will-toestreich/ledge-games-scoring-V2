@@ -196,6 +196,24 @@ describe("caber best-of-two", () => {
 // ─── Cuts & stratification ─────────────────────────────────
 
 describe("cuts and strata", () => {
+  it("partial round 1 ranks by cumulative — no phantom finals, no tied-at-1", () => {
+    // Regression: with only 3 of 75 scored, premature cuts used to cascade
+    // the scored competitors into a "finals" and tie them all at rank 1
+    const field = ["a", "b", "c", "d", "e"].map((id) => comp(id));
+    const res = run(pointsEvent(), field, [
+      score("a", 1, 1, 8),
+      score("b", 1, 1, 5),
+      score("c", 1, 1, 4),
+      // d, e haven't thrown round 1 yet
+    ]);
+    expect(res.byCompetitor.get("a")!.points).toBe(1);
+    expect(res.byCompetitor.get("b")!.points).toBe(2);
+    expect(res.byCompetitor.get("c")!.points).toBe(3);
+    expect(res.byCompetitor.get("a")!.isFinalist).toBe(false); // no cut locked yet
+    // Cut hasn't happened: everyone is still eligible for round 2
+    expect(res.eligibleByRound[1].length).toBe(5);
+  });
+
   it("half rounds up and ties at the line all advance", () => {
     // 5 competitors → top 3 advance; c and d tie for 3rd → 4 advance
     const field = ["a", "b", "c", "d", "e"].map((id) => comp(id));
