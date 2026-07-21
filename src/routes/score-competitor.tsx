@@ -230,47 +230,6 @@ function ScoreEntry({
                 )}
               </div>
 
-              {/* Chop penalty */}
-              {event.penaltySeconds !== undefined && (
-                <div className="mb-5 flex items-center justify-between rounded-xl bg-surface-overlay border border-border-subtle px-4 py-3">
-                  <div>
-                    <div className="text-sm font-medium text-text-primary">Axe-placement penalty</div>
-                    <div className="text-[11px] text-text-tertiary">
-                      +{event.penaltySeconds}s each · applied to attempt {activeAttempt + 1}
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <button
-                      onClick={() =>
-                        setPenalties((ps) => {
-                          const next = [...ps];
-                          next[activeAttempt] = Math.max(0, next[activeAttempt] - event.penaltySeconds!);
-                          return next;
-                        })
-                      }
-                      className="numpad-key px-3 py-1 text-sm"
-                    >
-                      −
-                    </button>
-                    <span className="font-mono text-sm text-text-primary w-10 text-center">
-                      +{penalties[activeAttempt]}s
-                    </span>
-                    <button
-                      onClick={() =>
-                        setPenalties((ps) => {
-                          const next = [...ps];
-                          next[activeAttempt] += event.penaltySeconds!;
-                          return next;
-                        })
-                      }
-                      className="numpad-key px-3 py-1 text-sm"
-                    >
-                      +
-                    </button>
-                  </div>
-                </div>
-              )}
-
               {/* Numpad */}
               <div className="grid grid-cols-3 gap-2 mb-5">
                 {[1, 2, 3, 4, 5, 6, 7, 8, 9].map((n) => (
@@ -309,6 +268,47 @@ function ScoreEntry({
                   {existing.length > 0 ? "Update Round" : partial && canSubmit ? `Save ${filled.length} of ${roundPlan.attempts}` : "Save Round"}
                 </button>
               </div>
+
+              {/* Chop penalty — secondary control, below the main actions */}
+              {event.penaltySeconds !== undefined && (
+                <div className="mt-4 flex items-center justify-between rounded-xl bg-surface-overlay border border-border-subtle px-4 py-3">
+                  <div>
+                    <div className="text-sm font-medium text-text-primary">Axe-placement penalty</div>
+                    <div className="text-[11px] text-text-tertiary">
+                      +{event.penaltySeconds}s each · applied to attempt {activeAttempt + 1}
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={() =>
+                        setPenalties((ps) => {
+                          const next = [...ps];
+                          next[activeAttempt] = Math.max(0, next[activeAttempt] - event.penaltySeconds!);
+                          return next;
+                        })
+                      }
+                      className="numpad-key px-3 py-1 text-sm"
+                    >
+                      −
+                    </button>
+                    <span className="font-mono text-sm text-text-primary w-10 text-center">
+                      +{penalties[activeAttempt]}s
+                    </span>
+                    <button
+                      onClick={() =>
+                        setPenalties((ps) => {
+                          const next = [...ps];
+                          next[activeAttempt] += event.penaltySeconds!;
+                          return next;
+                        })
+                      }
+                      className="numpad-key px-3 py-1 text-sm"
+                    >
+                      +
+                    </button>
+                  </div>
+                </div>
+              )}
               {roundPlan.attempts > 1 && (
                 <p className="text-[11px] text-text-tertiary mt-3 text-center">
                   Saving one attempt at a time is fine — record set 1 for the line, come back for set 2.
