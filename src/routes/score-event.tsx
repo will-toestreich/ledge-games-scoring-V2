@@ -325,18 +325,27 @@ function KegConsole({
     state: kegCompetitorState(c.id, attempts, ladder.attemptsPerHeight),
   }));
 
+  // Just-recorded rows HOLD their spot briefly with a confirmation flash so
+  // the scorer sees the tap land before the row reorders away
+  const [holds, setHolds] = useState<Record<string, KegAttempt["result"]>>({});
+  const isHeld = (id: string) => holds[id] !== undefined;
+
   const byBib = (a: { competitor: Competitor }, b: { competitor: Competitor }) =>
     a.competitor.bibNumber - b.competitor.bibNumber;
   const resolvedAtBar = (st: ReturnType<typeof kegCompetitorState>) =>
     st.attempts.some((a) => a.heightFt === height && (a.result === "clear" || a.result === "pass"));
-  const alive = states.filter(({ state }) => !state.out);
+  const alive = states.filter(({ competitor: c, state }) => !state.out || isHeld(c.id));
   // Whoever still owes an outcome at this bar stays on top; resolved
   // competitors drop below — bib order within each group
-  const stillToToss = alive.filter(({ state }) => !resolvedAtBar(state)).sort(byBib);
-  const doneAtBar = alive.filter(({ state }) => resolvedAtBar(state)).sort(byBib);
+  const stillToToss = alive
+    .filter(({ competitor: c, state }) => !resolvedAtBar(state) || isHeld(c.id))
+    .sort(byBib);
+  const doneAtBar = alive
+    .filter(({ competitor: c, state }) => resolvedAtBar(state) && !isHeld(c.id))
+    .sort(byBib);
   const orderedAlive = [...stillToToss, ...doneAtBar];
   const out = states
-    .filter(({ state }) => state.out)
+    .filter(({ competitor: c, state }) => state.out && !isHeld(c.id))
     .sort((a, b) => b.state.highestCleared - a.state.highestCleared);
 
   function act(competitorId: string, result: KegAttempt["result"], attemptNo: number) {
@@ -347,6 +356,14 @@ function KegConsole({
       attempt: attemptNo,
       result,
     });
+    // Flash the confirmation in place, then let the row reorder
+    setHolds((h) => ({ ...h, [competitorId]: result }));
+    setTimeout(() => {
+      setHolds((h) => {
+        const { [competitorId]: _gone, ...rest } = h;
+        return rest;
+      });
+    }, 1400);
   }
 
   return (
@@ -396,7 +413,7 @@ function KegConsole({
                   </span>
                 </div>
               )}
-              <KegRow c={c} state={state} height={height} event={event} color={color} act={act} undo={undo} />
+              <KegRow c={c} state={state} height={height} event={event} color={color} act={act} undo={undo} heldResult={holds[c.id]} />
             </div>
           );
         })}
@@ -439,6 +456,7 @@ function KegRow({
   color,
   act,
   undo,
+  heldResult,
 }: {
   c: Competitor;
   state: KegCompetitorState;
@@ -447,6 +465,8 @@ function KegRow({
   color: string;
   act: (competitorId: string, result: KegAttempt["result"], attemptNo: number) => void;
   undo: { mutate: (competitorId: string) => void };
+  /** Just-tapped result: show a confirmation flash before the row reorders. */
+  heldResult?: KegAttempt["result"];
 }) {
   const cleared = state.attempts.some((a) => a.heightFt === height && a.result === "clear");
   const passed = state.attempts.some((a) => a.heightFt === height && a.result === "pass");
@@ -469,7 +489,22 @@ function KegRow({
           {passed && ` · passed ${height}`}
         </div>
       </div>
-      {cleared || passed ? (
+      {heldResult ? (
+        <span
+          className={`animate-scale-in inline-flex items-center gap-1.5 text-[11px] font-bold px-3 py-1.5 rounded-full text-white ${
+            heldResult === "clear" ? "bg-emerald-500" : heldResult === "miss" ? "bg-red-500" : "bg-amber-500"
+          }`}
+        >
+          {heldResult === "clear" ? <Check size={13} /> : heldResult === "miss" ? <X size={13} /> : <FastForward size={13} />}
+          {heldResult === "clear"
+            ? `Cleared ${height} ${event.unit}`
+            : heldResult === "miss"
+              ? state.out
+                ? "Miss — OUT"
+                : "Miss recorded"
+              : `Passed ${height} ${event.unit}`}
+        </span>
+      ) : cleared || passed ? (
         <span className={`text-[11px] font-semibold px-2 py-1 rounded-full ${cleared ? "bg-emerald-500/15 text-emerald-400" : "bg-surface-overlay text-text-tertiary"}`}>
           {cleared ? "cleared" : "passed"}
         </span>
