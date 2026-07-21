@@ -492,7 +492,8 @@ export function eventProgress(res: EventResults): EventProgress {
     const complete = remaining <= 1;
     return {
       pct: complete ? 100 : remaining > 0 ? Math.round((done / remaining) * 100) : 100,
-      label: `${height} ft`,
+      // "at 11 ft · 4/69" = of the 69 still alive, 4 have resolved this bar
+      label: `at ${height} ft`,
       detail: `${done}/${remaining}`,
       complete,
       started: true,
