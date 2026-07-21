@@ -8,6 +8,7 @@ import {
   computeEventResults,
   divisionField,
   kegCompetitorState,
+  type KegCompetitorState,
 } from "@/lib/scoring";
 import {
   useActiveCompetition,
@@ -324,7 +325,16 @@ function KegConsole({
     state: kegCompetitorState(c.id, attempts, ladder.attemptsPerHeight),
   }));
 
+  const byBib = (a: { competitor: Competitor }, b: { competitor: Competitor }) =>
+    a.competitor.bibNumber - b.competitor.bibNumber;
+  const resolvedAtBar = (st: ReturnType<typeof kegCompetitorState>) =>
+    st.attempts.some((a) => a.heightFt === height && (a.result === "clear" || a.result === "pass"));
   const alive = states.filter(({ state }) => !state.out);
+  // Whoever still owes an outcome at this bar stays on top; resolved
+  // competitors drop below — bib order within each group
+  const stillToToss = alive.filter(({ state }) => !resolvedAtBar(state)).sort(byBib);
+  const doneAtBar = alive.filter(({ state }) => resolvedAtBar(state)).sort(byBib);
+  const orderedAlive = [...stillToToss, ...doneAtBar];
   const out = states
     .filter(({ state }) => state.out)
     .sort((a, b) => b.state.highestCleared - a.state.highestCleared);
@@ -367,72 +377,30 @@ function KegConsole({
         </div>
       </div>
 
-      {/* Alive competitors */}
-      <p className="section-label mb-3">In the Hunt ({alive.length})</p>
+      {/* Alive competitors — still-to-toss first, resolved below */}
+      <p className="section-label mb-3">
+        In the Hunt ({alive.length})
+        {stillToToss.length > 0 && (
+          <span className="normal-case font-normal text-text-tertiary"> — {stillToToss.length} to toss at {height} {event.unit}</span>
+        )}
+      </p>
       <div className="space-y-1.5 mb-8">
-        {alive.map(({ competitor: c, state }) => {
-          const cleared = state.attempts.some((a) => a.heightFt === height && a.result === "clear");
-          const passed = state.attempts.some((a) => a.heightFt === height && a.result === "pass");
-          const misses = state.missesAt(height);
-          const attemptNo = state.attempts.filter((a) => a.heightFt === height).length + 1;
+        {orderedAlive.map(({ competitor: c, state }, idx) => {
+          const firstResolved = idx === stillToToss.length && doneAtBar.length > 0 && stillToToss.length > 0;
           return (
-            <div key={c.id} className="flex items-center gap-2 px-3 py-2.5 rounded-xl bg-surface-raised border border-border-subtle">
-              <span className="bib-badge" style={{ backgroundColor: color }}>{c.bibNumber}</span>
-              <div className="flex-1 min-w-0">
-                <div className="font-medium text-sm text-text-primary truncate">
-                  {c.firstName} {c.lastName}
-                </div>
-                <div className="text-[11px] text-text-tertiary font-mono">
-                  best {state.highestCleared || "—"} {state.highestCleared ? event.unit : ""}
-                  {misses > 0 && ` · ${misses} miss${misses > 1 ? "es" : ""} @ ${height}`}
-                  {passed && ` · passed ${height}`}
-                </div>
-              </div>
-              {cleared || passed ? (
-                <span className={`text-[11px] font-semibold px-2 py-1 rounded-full ${cleared ? "bg-emerald-500/15 text-emerald-400" : "bg-surface-overlay text-text-tertiary"}`}>
-                  {cleared ? "cleared" : "passed"}
-                </span>
-              ) : (
-                <div className="flex gap-1">
-                  <button
-                    onClick={() => act(c.id, "clear", attemptNo)}
-                    className="px-2.5 py-1.5 rounded-lg bg-emerald-500/15 text-emerald-400 hover:bg-emerald-500/25 transition-colors"
-                    title={`Cleared ${height}`}
-                  >
-                    <Check size={15} />
-                  </button>
-                  <button
-                    onClick={() => act(c.id, "miss", attemptNo)}
-                    className="px-2.5 py-1.5 rounded-lg bg-red-500/15 text-red-400 hover:bg-red-500/25 transition-colors"
-                    title={`Missed ${height}`}
-                  >
-                    <X size={15} />
-                  </button>
-                  {misses === 0 && (
-                    <button
-                      onClick={() => act(c.id, "pass", 1)}
-                      className="px-2.5 py-1.5 rounded-lg bg-surface-overlay text-text-tertiary hover:text-text-primary transition-colors"
-                      title={`Pass at ${height}`}
-                    >
-                      <FastForward size={15} />
-                    </button>
-                  )}
+            <div key={c.id}>
+              {firstResolved && (
+                <div className="border-t border-border-subtle/60 mt-3 mb-2 pt-1">
+                  <span className="text-[10px] uppercase tracking-wider text-text-tertiary">
+                    Done at {height} {event.unit} ({doneAtBar.length})
+                  </span>
                 </div>
               )}
-              {state.attempts.length > 0 && (
-                <button
-                  onClick={() => undo.mutate(c.id)}
-                  className="p-1.5 text-text-tertiary hover:text-text-primary transition-colors"
-                  title="Undo last"
-                >
-                  <Undo2 size={14} />
-                </button>
-              )}
+              <KegRow c={c} state={state} height={height} event={event} color={color} act={act} undo={undo} />
             </div>
           );
         })}
       </div>
-
       {/* Out */}
       {out.length > 0 && (
         <>
@@ -460,5 +428,87 @@ function KegConsole({
         </>
       )}
     </>
+  );
+}
+
+function KegRow({
+  c,
+  state,
+  height,
+  event,
+  color,
+  act,
+  undo,
+}: {
+  c: Competitor;
+  state: KegCompetitorState;
+  height: number;
+  event: EventConfig;
+  color: string;
+  act: (competitorId: string, result: KegAttempt["result"], attemptNo: number) => void;
+  undo: { mutate: (competitorId: string) => void };
+}) {
+  const cleared = state.attempts.some((a) => a.heightFt === height && a.result === "clear");
+  const passed = state.attempts.some((a) => a.heightFt === height && a.result === "pass");
+  const misses = state.missesAt(height);
+  const attemptNo = state.attempts.filter((a) => a.heightFt === height).length + 1;
+  return (
+    <div className={`flex items-center gap-2 px-3 py-2.5 rounded-xl border ${
+      cleared || passed
+        ? "bg-surface-raised/40 border-transparent"
+        : "bg-surface-raised border-border-subtle"
+    }`}>
+      <span className="bib-badge" style={{ backgroundColor: cleared || passed ? `${color}80` : color }}>{c.bibNumber}</span>
+      <div className="flex-1 min-w-0">
+        <div className={`font-medium text-sm truncate ${cleared || passed ? "text-text-tertiary" : "text-text-primary"}`}>
+          {c.firstName} {c.lastName}
+        </div>
+        <div className="text-[11px] text-text-tertiary font-mono">
+          best {state.highestCleared || "—"} {state.highestCleared ? event.unit : ""}
+          {misses > 0 && ` · ${misses} miss${misses > 1 ? "es" : ""} @ ${height}`}
+          {passed && ` · passed ${height}`}
+        </div>
+      </div>
+      {cleared || passed ? (
+        <span className={`text-[11px] font-semibold px-2 py-1 rounded-full ${cleared ? "bg-emerald-500/15 text-emerald-400" : "bg-surface-overlay text-text-tertiary"}`}>
+          {cleared ? "cleared" : "passed"}
+        </span>
+      ) : (
+        <div className="flex gap-1">
+          <button
+            onClick={() => act(c.id, "clear", attemptNo)}
+            className="px-2.5 py-1.5 rounded-lg bg-emerald-500/15 text-emerald-400 hover:bg-emerald-500/25 transition-colors"
+            title={`Cleared ${height}`}
+          >
+            <Check size={15} />
+          </button>
+          <button
+            onClick={() => act(c.id, "miss", attemptNo)}
+            className="px-2.5 py-1.5 rounded-lg bg-red-500/15 text-red-400 hover:bg-red-500/25 transition-colors"
+            title={`Missed ${height}`}
+          >
+            <X size={15} />
+          </button>
+          {misses === 0 && (
+            <button
+              onClick={() => act(c.id, "pass", 1)}
+              className="px-2.5 py-1.5 rounded-lg bg-surface-overlay text-text-tertiary hover:text-text-primary transition-colors"
+              title={`Pass at ${height}`}
+            >
+              <FastForward size={15} />
+            </button>
+          )}
+        </div>
+      )}
+      {state.attempts.length > 0 && (
+        <button
+          onClick={() => undo.mutate(c.id)}
+          className="p-1.5 text-text-tertiary hover:text-text-primary transition-colors"
+          title="Undo last"
+        >
+          <Undo2 size={14} />
+        </button>
+      )}
+    </div>
   );
 }
