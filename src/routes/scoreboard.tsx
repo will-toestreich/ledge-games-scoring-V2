@@ -3,6 +3,7 @@ import { Link } from "@tanstack/react-router";
 import { Shield, Crosshair, Sun, Moon, Swords } from "lucide-react";
 import { useTheme } from "@/lib/theme";
 import { EventIcon } from "@/components/event-icons";
+import { BrandLogo } from "@/components/brand-logo";
 import { divisionEvents } from "@/data/competition-config";
 import { useActiveCompetition, useActiveDivisions, useDivisionScoring, useSettings } from "@/data/hooks";
 import type { Division, DivisionId, EventId } from "@/lib/types";
@@ -79,7 +80,7 @@ export function ScoreboardPage() {
 
         {/* Centered logo overlaps the wrapped tab row on small screens */}
         <Link to="/" className="absolute left-1/2 -translate-x-1/2 hidden lg:flex items-center justify-center">
-          <img src={`${import.meta.env.BASE_URL}brand/The-Ledge-Games-Logo-4.png`} alt="The Ledge Games" style={{ height: "clamp(20px, 2.5vh, 32px)" }} />
+          <BrandLogo style={{ height: "clamp(20px, 2.5vh, 32px)" }} />
         </Link>
 
         <div className="ml-auto flex items-center" style={{ gap: "clamp(6px, 0.6vw, 12px)" }}>
@@ -336,7 +337,7 @@ function StandingRow({
   /** Dynamic sizing: exact row height in px, font scales with it. */
   rowHeight?: number;
 }) {
-  const gold = i === 0 ? { color: "#FFD700" } : {};
+  const gold = i === 0 ? { color: "var(--color-gold)" } : {};
   const sizing = rowHeight
     ? {
         height: rowHeight,
@@ -389,7 +390,7 @@ function StandingRow({
           <span
             key={e.id}
             className={`font-mono text-center ${isFirst ? "font-semibold" : "text-text-secondary"}`}
-            style={{ flex: "1 1 0", minWidth: 0, fontSize: "0.85em", ...(isFirst ? { color: "#FFD700" } : {}) }}
+            style={{ flex: "1 1 0", minWidth: 0, fontSize: "0.85em", ...(isFirst ? { color: "var(--color-gold)" } : {}) }}
           >
             {pts ?? "—"}
           </span>

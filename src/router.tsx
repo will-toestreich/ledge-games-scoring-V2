@@ -9,6 +9,7 @@ import {
 import { Shield, Crosshair, BarChart3, Sun, Moon, CloudUpload } from "lucide-react";
 import { useTheme } from "./lib/theme";
 import { useCompetitors, useDbSync, useOutboxCount, useSettings } from "./data/hooks";
+import { BrandLogo } from "./components/brand-logo";
 import { AdminPage } from "./routes/admin";
 import { ScorePage } from "./routes/score";
 import { ScoreEventPage } from "./routes/score-event";
@@ -33,11 +34,7 @@ function RootLayout() {
         <nav className="glass sticky top-0 z-50 border-b border-border-subtle">
           <div className="px-3 sm:px-6 lg:px-8 flex items-center h-14 gap-3 sm:gap-8">
             <Link to="/" className="flex items-center gap-3 shrink-0">
-              <img
-                src={`${import.meta.env.BASE_URL}brand/The-Ledge-Games-Logo-4.png`}
-                alt="The Ledge Games"
-                className="h-7"
-              />
+              <BrandLogo className="h-7" />
             </Link>
 
             <div className="flex items-center gap-1 ml-auto">
@@ -144,12 +141,8 @@ function LandingPage() {
       />
 
       <div className="relative text-center space-y-8 sm:space-y-10 px-6 animate-slide-up w-full">
-        {/* Stacked logo — scaled to the screen, never edge-to-edge */}
-        <img
-          src={`${import.meta.env.BASE_URL}brand/The-Ledge-Games-Logo-4.png`}
-          alt="The Ledge Games"
-          className="h-auto w-full max-w-[300px] sm:max-w-[420px] md:max-w-[520px] mx-auto drop-shadow-2xl"
-        />
+        {/* Wordmark — scaled to the screen, never edge-to-edge */}
+        <BrandLogo className="h-auto w-full max-w-[300px] sm:max-w-[420px] md:max-w-[520px] mx-auto drop-shadow-2xl" />
 
         <div className="space-y-2 sm:space-y-3">
           <p className="text-text-secondary text-lg tracking-wide">
