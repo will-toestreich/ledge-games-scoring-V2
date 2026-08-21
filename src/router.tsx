@@ -208,6 +208,12 @@ const scoreEventRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/score/$eventId",
   component: ScoreEventPage,
+  // Division lives in the URL so saving a score returns the scorer to the
+  // division they were working, and refresh/back keep it
+  validateSearch: (search: Record<string, unknown>): { division?: "mens" | "womens" | "mentors" } => {
+    const d = search.division;
+    return d === "mens" || d === "womens" || d === "mentors" ? { division: d } : {};
+  },
 });
 
 const scoreCompetitorRoute = createRoute({

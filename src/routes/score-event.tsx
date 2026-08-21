@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Link } from "@tanstack/react-router";
+import { Link, useNavigate, useSearch } from "@tanstack/react-router";
 import { ChevronLeft, ChevronUp, ChevronDown, Undo2, Check, X, FastForward, Scissors } from "lucide-react";
 import { useParams } from "@tanstack/react-router";
 import { divisions, getEvent, roundLabel } from "@/data/competition-config";
@@ -43,10 +43,21 @@ function EventScoring({ event }: { event: EventConfig }) {
   const { data: activeComp } = useActiveCompetition();
   const activeDivisions = useActiveDivisions();
   const eventDivisions = activeDivisions.filter((d) => event.divisions[d.id]);
-  const [divisionId, setDivisionId] = useState<DivisionId>(eventDivisions[0].id);
-  // The selected division can go inactive live (mentors toggled off mid-event)
-  const division = eventDivisions.find((d) => d.id === divisionId) ?? eventDivisions[0];
+  // Division comes from the URL (single source of truth): saving a score
+  // navigates back with the competitor's division, so a scorer working the
+  // women's line lands back on the women's queue. Falls back to the first
+  // division when absent or inactive (mentors toggled off mid-event).
+  const search = useSearch({ from: "/score/$eventId" }) as { division?: DivisionId };
+  const navigate = useNavigate();
+  const division = eventDivisions.find((d) => d.id === search.division) ?? eventDivisions[0];
   const activeDivisionId = division.id;
+  const setDivisionId = (id: DivisionId) =>
+    navigate({
+      to: "/score/$eventId",
+      params: { eventId: event.id },
+      search: { division: id },
+      replace: true,
+    });
 
   const competitors = useCompetitors();
   const scores = useScores();
@@ -142,9 +153,16 @@ function RoundsScoring({
   const eligible = eligibleIds.map((id) => byId.get(id)!).filter(Boolean);
 
   // A round is done for a competitor once EVERY set/flip is in — someone
-  // with only set 1 recorded stays in the queue for set 2
+  // with only set 1 recorded stays in the queue for set 2. Partials float
+  // to the top (finish what's started); bib order within each group.
   const stateOf = (id: string) => results.byCompetitor.get(id)!;
-  const unscored = eligible.filter((c) => !stateOf(c.id).roundComplete[round - 1]);
+  const unscored = eligible
+    .filter((c) => !stateOf(c.id).roundComplete[round - 1])
+    .sort((a, b) => {
+      const aStarted = stateOf(a.id).roundAttempts[round - 1] > 0 ? 0 : 1;
+      const bStarted = stateOf(b.id).roundAttempts[round - 1] > 0 ? 0 : 1;
+      return aStarted - bStarted || a.bibNumber - b.bibNumber;
+    });
   const scored = eligible.filter((c) => stateOf(c.id).roundComplete[round - 1]);
   const cut = field.filter(
     (c) => !results.byCompetitor.get(c.id)!.skipped && !eligibleIds.includes(c.id)

@@ -154,7 +154,17 @@ function ScoreEntry({
     save.mutate({ attempts, removeIds }, {
       onSuccess: () => {
         setSubmitted(true);
-        setTimeout(() => navigate({ to: "/score/$eventId", params: { eventId: event.id } }), 700);
+        // Return to the queue of THIS competitor's division — a scorer
+        // working the women's line lands back on the women's list
+        setTimeout(
+          () =>
+            navigate({
+              to: "/score/$eventId",
+              params: { eventId: event.id },
+              search: { division: competitor.divisionId },
+            }),
+          700
+        );
       },
     });
   }
@@ -166,6 +176,7 @@ function ScoreEntry({
       <Link
         to="/score/$eventId"
         params={{ eventId: event.id }}
+        search={{ division: competitor.divisionId }}
         className="btn-ghost text-sm text-text-tertiary mb-4 -ml-3 inline-flex items-center gap-1 hover:text-text-primary"
       >
         <ChevronLeft size={16} />
@@ -338,7 +349,14 @@ function ScoreEntry({
                   onClick={() =>
                     remove.mutate(
                       { competitorId, eventId: event.id, round },
-                      { onSuccess: () => navigate({ to: "/score/$eventId", params: { eventId: event.id } }) }
+                      {
+                        onSuccess: () =>
+                          navigate({
+                            to: "/score/$eventId",
+                            params: { eventId: event.id },
+                            search: { division: competitor.divisionId },
+                          }),
+                      }
                     )
                   }
                   className="text-xs text-red-400/80 hover:text-red-400 transition-colors"
