@@ -344,8 +344,8 @@ function EventStrip({ compact = false }: { compact?: boolean }) {
                         className="text-right font-mono text-amber-400"
                         style={{ fontSize: "clamp(7px, 0.45vw, 9px)", paddingLeft: "clamp(34px, 3.4vw, 58px)" }}
                       >
-                        ✂ top {cut.target}
-                        {cutTies} · {cut.bubbleScore!.toFixed(event.decimals)} {event.unit}
+                        top {cut.target}
+                        {cutTies} · Projected Cut @ {cut.bubbleScore!.toFixed(event.decimals)} {event.unit}
                       </div>
                     )}
                   </div>
@@ -689,8 +689,8 @@ function DivisionDetail({ divisionId }: { divisionId: DivisionId }) {
                     className="text-[10px] font-mono text-amber-400 mt-1"
                     title={`Projected cut after Rd ${cut.afterRound}: top ${cut.target}${cut.advancerIds.length > cut.target ? ` (+${cut.advancerIds.length - cut.target} on ties)` : ""} advance · ${cut.scoredCount}/${cut.eligibleCount} scored — moves until the round completes`}
                   >
-                    ✂ cut: top {cut.target}
-                    {cut.advancerIds.length > cut.target ? `+${cut.advancerIds.length - cut.target}` : ""} · {cut.bubbleScore!.toFixed(event.decimals)} {event.unit}
+                    top {cut.target}
+                    {cut.advancerIds.length > cut.target ? `+${cut.advancerIds.length - cut.target}` : ""} · Projected Cut @ {cut.bubbleScore!.toFixed(event.decimals)} {event.unit}
                   </div>
                 )}
               </div>

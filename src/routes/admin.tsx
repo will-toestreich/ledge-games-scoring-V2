@@ -2251,21 +2251,19 @@ function EventStatusCard({
               <div className="text-[9px] text-text-tertiary mt-0.5">{label}</div>
               {cut && cutReady && (
                 <div
-                  className="text-[9px] text-amber-400 mt-0.5 inline-flex items-center gap-0.5 font-mono"
+                  className="text-[9px] text-amber-400 mt-0.5 font-mono"
                   title={`Projected cut after Rd ${cut.afterRound}: top ${cut.target}${ties && ` (${ties} on ties)`} advance · line at ${cut.bubbleScore!.toFixed(event.decimals)} ${event.unit} · ${cut.scoredCount}/${cut.eligibleCount} scored — keeps moving until the round is fully scored`}
                 >
-                  <Scissors size={9} className="shrink-0" />
                   top {cut.target}
-                  {ties} · {cut.bubbleScore!.toFixed(event.decimals)} {event.unit}
+                  {ties} · Projected Cut @ {cut.bubbleScore!.toFixed(event.decimals)} {event.unit}
                 </div>
               )}
               {cut && !cutReady && (
                 <div
-                  className="text-[9px] text-text-tertiary mt-0.5 inline-flex items-center gap-0.5 font-mono"
+                  className="text-[9px] text-text-tertiary mt-0.5 font-mono"
                   title={`This round cuts to top ${cut.target}. The projected line appears once half the round is scored (${cut.scoredCount}/${cut.eligibleCount} in so far).`}
                 >
-                  <Scissors size={9} className="shrink-0" />
-                  top {cut.target} · forming
+                  top {cut.target} · cut forming
                 </div>
               )}
             </div>
