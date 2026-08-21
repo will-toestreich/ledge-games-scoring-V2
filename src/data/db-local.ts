@@ -298,13 +298,16 @@ export async function updateCompetitor(id: string, patch: Partial<Competitor>): 
   persist();
 }
 
-/** Add competitors (walk-ons or CSV import). Rejects duplicate bib numbers. */
+/** Add competitors (walk-ons or CSV import). Rejects duplicate bibs and ids. */
 export async function addCompetitors(newComps: Competitor[]): Promise<void> {
   const comp = active();
   const taken = new Set(comp.competitors.map((c) => c.bibNumber));
+  const takenIds = new Set(comp.competitors.map((c) => c.id));
   for (const c of newComps) {
     if (taken.has(c.bibNumber)) throw new Error(`Bib ${c.bibNumber} is already taken`);
+    if (takenIds.has(c.id)) throw new Error(`Competitor id ${c.id} already exists`);
     taken.add(c.bibNumber);
+    takenIds.add(c.id);
   }
   comp.competitors.push(...structuredClone(newComps));
   comp.competitors.sort((a, b) => a.bibNumber - b.bibNumber);

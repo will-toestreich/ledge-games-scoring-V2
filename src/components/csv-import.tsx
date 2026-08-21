@@ -4,7 +4,8 @@ import { CheckCircle2, AlertTriangle } from "lucide-react";
 import { getDivision } from "@/data/competition-config";
 import type { Competitor, DivisionId } from "@/lib/types";
 import { useAddCompetitors } from "@/data/hooks";
-import { Modal, SHIRT_SIZES } from "./competitor-form";
+import { SHIRT_SIZES, newCompetitorId } from "@/lib/roster";
+import { Modal } from "./competitor-form";
 
 interface ParsedRow {
   line: number;
@@ -77,7 +78,7 @@ function parseRows(file: File, existing: Competitor[]): Promise<ParsedRow[]> {
               errors.length > 0
                 ? null
                 : {
-                    id: `b${bib}`,
+                    id: newCompetitorId(bib),
                     divisionId: divisionId!,
                     bibNumber: bib,
                     firstName: first,
@@ -86,8 +87,10 @@ function parseRows(file: File, existing: Competitor[]): Promise<ParsedRow[]> {
                     hometown: get("hometown") || null,
                     email: get("email") || null,
                     shirtSize,
-                    registration: registration ?? "paid",
-                    paid: true,
+                    // No registration info → assume cash at the event, not
+                    // yet collected; only online-"paid" rows import as paid
+                    registration: registration ?? "cash",
+                    paid: registration === "paid",
                     checkedIn: false,
                     noShow: false,
                     eventSkips: [],

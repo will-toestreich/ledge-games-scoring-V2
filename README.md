@@ -54,7 +54,8 @@ and **stall alarms**, plus arrow-off recording when a title ends tied.
   Query hooks — the planned Supabase swap touches one file.
   **Until then, all data lives in one browser profile: use
   Settings → Data → Download backup early and often.** Restore replaces
-  everything from a backup file.
+  everything from a backup file — a pre-restore snapshot downloads
+  automatically first, so a restore is always undoable.
 - The **2025 season** ships as a built-in archive, imported from the original
   Google Sheets by [scripts/import-2025.mjs](scripts/import-2025.mjs) (raw
   CSVs in `scripts/data-2025/`).

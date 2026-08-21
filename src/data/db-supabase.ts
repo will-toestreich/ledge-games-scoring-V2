@@ -628,6 +628,29 @@ export async function exportBackup(): Promise<string> {
   return JSON.stringify({ competitions, activeId }, null, 1);
 }
 
+/** Wipe every competition and rebuild from the given list. NOT transactional. */
+async function wipeAndRebuild(comps: BackupCompetition[], preferredActiveId?: string): Promise<void> {
+  fail((await sb().from("v2_app_state").update({ active_competition_id: null }).eq("id", 1)).error);
+  fail((await sb().from("v2_competitions").delete().neq("id", "")).error); // cascade-deletes children
+  for (const c of comps) {
+    fail(
+      (
+        await sb()
+          .from("v2_competitions")
+          .insert(settingsToCompetitionRow(c.id, c.status === "active" ? "active" : "completed", {
+            ...c.settings,
+            mentorsEnabled: c.settings.mentorsEnabled ?? true,
+          }))
+      ).error
+    );
+    await insertSeasonChildren(c.id, c);
+  }
+  const activeId = comps.some((c) => c.id === preferredActiveId)
+    ? preferredActiveId!
+    : comps[comps.length - 1].id;
+  fail((await sb().from("v2_app_state").update({ active_competition_id: activeId }).eq("id", 1)).error);
+}
+
 export async function importBackup(raw: string): Promise<{ competitions: number }> {
   let parsed: { competitions?: BackupCompetition[]; activeId?: string };
   try {
@@ -651,24 +674,31 @@ export async function importBackup(raw: string): Promise<{ competitions: number 
       throw new Error("Backup format not recognized — a season record is malformed.");
     }
   }
-  // Wipe and rebuild (competitions cascade-deletes all children)
-  fail((await sb().from("v2_app_state").update({ active_competition_id: null }).eq("id", 1)).error);
-  fail((await sb().from("v2_competitions").delete().neq("id", "")).error);
-  for (const c of comps) {
-    fail(
-      (
-        await sb()
-          .from("v2_competitions")
-          .insert(settingsToCompetitionRow(c.id, c.status === "active" ? "active" : "completed", {
-            ...c.settings,
-            mentorsEnabled: c.settings.mentorsEnabled ?? true,
-          }))
-      ).error
+  // Snapshot-first: the wipe+rebuild isn't transactional, so hold the current
+  // database in memory and roll back to it if the restore fails partway
+  const snapshot = JSON.parse(await exportBackup()) as {
+    competitions: BackupCompetition[];
+    activeId?: string;
+  };
+  try {
+    await wipeAndRebuild(comps, parsed.activeId);
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    let rolledBack = false;
+    try {
+      await wipeAndRebuild(snapshot.competitions, snapshot.activeId);
+      rolledBack = true;
+    } catch {
+      // keep the original error — the admin also holds the pre-restore download
+    }
+    activeIdCache = null;
+    emitUpdated();
+    throw new Error(
+      rolledBack
+        ? `Restore failed — the previous data was put back. (${msg})`
+        : `Restore failed AND rollback failed — recover using the pre-restore snapshot file. (${msg})`
     );
-    await insertSeasonChildren(c.id, c);
   }
-  const activeId = comps.some((c) => c.id === parsed.activeId) ? parsed.activeId! : comps[comps.length - 1].id;
-  fail((await sb().from("v2_app_state").update({ active_competition_id: activeId }).eq("id", 1)).error);
   activeIdCache = null;
   emitUpdated();
   return { competitions: comps.length };

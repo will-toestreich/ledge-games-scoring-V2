@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { X, Trash2 } from "lucide-react";
 import { getDivision } from "@/data/competition-config";
+import { SHIRT_SIZES, newCompetitorId, nextFreeBib } from "@/lib/roster";
 import type { Competitor, DivisionId } from "@/lib/types";
 import {
   useActiveDivisions,
@@ -11,18 +12,6 @@ import {
   useScores,
   useUpdateCompetitor,
 } from "@/data/hooks";
-
-export const SHIRT_SIZES = ["S", "M", "L", "XL", "2XL", "3XL"];
-
-/** Bib blocks per the rules: Men's from #1, Women's from #101, Mentors from #151. */
-const BIB_START: Record<DivisionId, number> = { mens: 1, womens: 101, mentors: 151 };
-
-export function nextFreeBib(divisionId: DivisionId, competitors: Competitor[]): number {
-  const taken = new Set(competitors.map((c) => c.bibNumber));
-  let bib = BIB_START[divisionId];
-  while (taken.has(bib)) bib++;
-  return bib;
-}
 
 export function Modal({ title, onClose, children }: { title: string; onClose: () => void; children: React.ReactNode }) {
   return (
@@ -138,7 +127,7 @@ export function CompetitorFormModal({
       }
     } else {
       add.mutate(
-        [{ id: `b${bibNum}`, noShow: false, eventSkips: [], ...patch }],
+        [{ id: newCompetitorId(bibNum), noShow: false, eventSkips: [], ...patch }],
         { onSuccess: onClose, onError: (e) => setError(String(e)) }
       );
     }
