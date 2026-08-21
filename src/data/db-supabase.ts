@@ -13,7 +13,7 @@ import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import type { AttemptScore, Competitor, DivisionId, KegAttempt, Settings } from "@/lib/types";
 import { buildSeed } from "./seed";
 import { DB_UPDATED_EVENT, OUTBOX_UPDATED_EVENT } from "./db-events";
-import type { CompetitionMeta, CompetitionStatus } from "./db-local";
+import type { CompetitionMeta, CompetitionStatus, DbStatus } from "./db-local";
 import season2025Json from "./season-2025.json";
 
 const url = import.meta.env.VITE_SUPABASE_URL as string | undefined;
@@ -267,6 +267,31 @@ function writeOutbox(queue: QueuedWrite[]) {
 
 export function getPendingWrites(): number {
   return readOutbox().length;
+}
+
+/**
+ * Health ping: one trivial read with a hard timeout. A paused free-tier
+ * project (or dead Wi-Fi) surfaces as ok:false instead of hanging forever.
+ */
+export async function pingDatabase(): Promise<DbStatus> {
+  const t0 = Date.now();
+  try {
+    const res = await Promise.race([
+      sb().from("v2_app_state").select("id").limit(1),
+      new Promise<never>((_, rej) =>
+        setTimeout(() => rej(new Error("no response in 8s — project paused or offline")), 8_000)
+      ),
+    ]);
+    const error = (res as { error: { message: string } | null }).error;
+    return { ok: !error, mode: "cloud", latencyMs: Date.now() - t0, message: error?.message };
+  } catch (e) {
+    return {
+      ok: false,
+      mode: "cloud",
+      latencyMs: Date.now() - t0,
+      message: e instanceof Error ? e.message : String(e),
+    };
+  }
 }
 
 function isNetworkError(e: unknown): boolean {

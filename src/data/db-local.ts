@@ -28,6 +28,14 @@ export interface CompetitionRecord {
   settings: Settings;
 }
 
+/** Result of a database health ping (admin status pill). */
+export interface DbStatus {
+  ok: boolean;
+  mode: "cloud" | "local";
+  latencyMs: number;
+  message?: string;
+}
+
 export interface CompetitionMeta {
   id: string;
   name: string;
@@ -347,6 +355,11 @@ export async function exportBackup(): Promise<string> {
 /** Local adapter never queues writes. */
 export function getPendingWrites(): number {
   return 0;
+}
+
+/** Local mode is always "up" — the data lives in this browser. */
+export async function pingDatabase(): Promise<DbStatus> {
+  return { ok: true, mode: "local", latencyMs: 0 };
 }
 
 /** Replace EVERYTHING with a backup file's contents. Validates first. */

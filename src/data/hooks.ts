@@ -34,6 +34,21 @@ export function useDbSync() {
   }, [qc]);
 }
 
+/**
+ * Database health for the admin status pill: pings every 30s with a hard
+ * timeout, so a paused cloud project reads as "unreachable" within seconds
+ * instead of silently stalling every query.
+ */
+export function useDbStatus() {
+  return useQuery({
+    queryKey: ["dbStatus"],
+    queryFn: db.pingDatabase,
+    refetchInterval: 30_000,
+    retry: false,
+    refetchOnWindowFocus: true,
+  });
+}
+
 /** Writes queued offline, waiting to sync (cloud adapter only). */
 export function useOutboxCount(): number {
   const [count, setCount] = useState(() => db.getPendingWrites());

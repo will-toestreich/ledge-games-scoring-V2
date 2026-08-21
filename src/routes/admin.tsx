@@ -55,6 +55,7 @@ import {
   useCompetitions,
   useCompetitors,
   useCreateCompetition,
+  useDbStatus,
   useDeleteCompetition,
   useDivisionScoring,
   useKegAttempts,
@@ -95,6 +96,7 @@ export function AdminPage() {
               {activeComp.status === "active" ? "active" : "completed season"}
             </span>
           )}
+          <DbStatusPill />
         </div>
         <p className="text-text-secondary text-sm">
           {settings?.competitionName ?? "The Ledge Games"} {settings?.year ?? ""}
@@ -134,6 +136,47 @@ export function AdminPage() {
 }
 
 // ─── Shared bits ───────────────────────────────────────────
+
+/**
+ * Live database health: green = cloud responding (with latency), red = the
+ * ping timed out or errored (a paused free-tier project reads exactly like
+ * this), gray = local browser storage. Click to re-ping immediately.
+ */
+function DbStatusPill() {
+  const { data, isFetching, refetch } = useDbStatus();
+  if (!data) return null;
+  const cfg =
+    data.mode === "local"
+      ? {
+          dot: "bg-surface-overlay border border-border-strong",
+          cls: "text-text-tertiary border-border-subtle bg-surface-overlay/50",
+          label: "local data",
+          title: "Data lives in this browser's storage — no cloud database configured.",
+        }
+      : data.ok
+        ? {
+            dot: "bg-emerald-400",
+            cls: "text-emerald-400 border-emerald-500/30 bg-emerald-500/10",
+            label: `cloud db · ${data.latencyMs}ms`,
+            title: "Cloud database is up and answering. Click to re-check.",
+          }
+        : {
+            dot: "bg-red-500 animate-pulse",
+            cls: "text-red-400 border-red-500/40 bg-red-500/10",
+            label: "cloud db unreachable",
+            title: `${data.message ?? "No response"} — if this device is online, the Supabase project is likely PAUSED (free tier pauses after ~7 idle days). Restore it at supabase.com/dashboard. Click to re-check.`,
+          };
+  return (
+    <button
+      onClick={() => refetch()}
+      title={cfg.title}
+      className={`inline-flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-wider px-2.5 py-1 rounded-full border transition-opacity ${cfg.cls} ${isFetching ? "opacity-60" : ""}`}
+    >
+      <span className={`w-1.5 h-1.5 rounded-full ${cfg.dot}`} />
+      {cfg.label}
+    </button>
+  );
+}
 
 function FilterPill({
   active,

@@ -6,7 +6,7 @@ import * as local from "./db-local";
 import * as cloud from "./db-supabase";
 
 export { DB_UPDATED_EVENT, OUTBOX_UPDATED_EVENT } from "./db-events";
-export type { CompetitionMeta, CompetitionStatus } from "./db-local";
+export type { CompetitionMeta, CompetitionStatus, DbStatus } from "./db-local";
 
 /** True when the app is running against Supabase. */
 export const usingCloud = cloud.isConfigured;
@@ -35,6 +35,7 @@ export const deleteCompetitorScores = impl.deleteCompetitorScores;
 export const deleteCompetitor = impl.deleteCompetitor;
 export const saveSettings = impl.saveSettings;
 
+export const pingDatabase = impl.pingDatabase;
 export const resetDemoData = impl.resetDemoData;
 export const loadSeason2025 = impl.loadSeason2025;
 export const exportBackup = impl.exportBackup;
