@@ -22,6 +22,17 @@ import { queryClient } from "./data/hooks";
 import { router } from "./router";
 import "./index.css";
 
+// Dev-only: live mock event replay — open any page with ?mockevent, or call
+// runMockEvent() in the console. Dead-code-eliminated from production builds.
+if (import.meta.env.DEV) {
+  void import("./dev/mock-event").then((m) => {
+    const w = window as unknown as Record<string, unknown>;
+    w.runMockEvent = m.runMockEvent;
+    w.stopMockEvent = m.stopMockEvent;
+    if (new URLSearchParams(location.search).has("mockevent")) void m.runMockEvent();
+  });
+}
+
 createRoot(document.getElementById("root")!).render(
   <StrictMode>
     <QueryClientProvider client={queryClient}>
