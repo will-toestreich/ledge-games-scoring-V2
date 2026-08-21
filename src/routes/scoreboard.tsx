@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Link } from "@tanstack/react-router";
-import { Shield, Crosshair, Sun, Moon, Swords } from "lucide-react";
+import { Shield, Crosshair, Mic, Sun, Moon, Swords } from "lucide-react";
 import { useTheme } from "@/lib/theme";
 import { EventIcon } from "@/components/event-icons";
 import { BrandLogo } from "@/components/brand-logo";
@@ -89,6 +89,9 @@ export function ScoreboardPage() {
           </Link>
           <Link to="/score" className="text-text-tertiary hover:text-text-primary transition-colors inline-flex items-center" style={{ gap: "clamp(2px, 0.2vw, 4px)", fontSize: "clamp(8px, 0.5vw, 10px)" }}>
             <Crosshair size={12} /> Scoring
+          </Link>
+          <Link to="/mc" className="text-text-tertiary hover:text-text-primary transition-colors inline-flex items-center" style={{ gap: "clamp(2px, 0.2vw, 4px)", fontSize: "clamp(8px, 0.5vw, 10px)" }}>
+            <Mic size={12} /> MC
           </Link>
           <ScoreboardThemeToggle />
           <div className="h-3 w-px bg-border-subtle" />

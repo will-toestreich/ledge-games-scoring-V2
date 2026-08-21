@@ -6,11 +6,12 @@ import {
   Link,
   useMatchRoute,
 } from "@tanstack/react-router";
-import { Shield, Crosshair, BarChart3, Sun, Moon, CloudUpload } from "lucide-react";
+import { Shield, Crosshair, BarChart3, Sun, Moon, CloudUpload, Mic } from "lucide-react";
 import { useTheme } from "./lib/theme";
 import { useCompetitors, useDbSync, useOutboxCount, useSettings } from "./data/hooks";
 import { BrandLogo } from "./components/brand-logo";
 import { AdminPage } from "./routes/admin";
+import { AnnouncerPage } from "./routes/mc";
 import { ScorePage } from "./routes/score";
 import { ScoreEventPage } from "./routes/score-event";
 import { ScoreCompetitorPage } from "./routes/score-competitor";
@@ -24,6 +25,7 @@ function RootLayout() {
   const isHome = matchRoute({ to: "/" });
   const isAdmin = matchRoute({ to: "/admin", fuzzy: true });
   const isScore = matchRoute({ to: "/score", fuzzy: true });
+  const isMc = matchRoute({ to: "/mc", fuzzy: true });
   const isScoreboard = matchRoute({ to: "/scoreboard", fuzzy: true });
 
   return (
@@ -41,6 +43,7 @@ function RootLayout() {
               <OutboxBadge />
               <NavPill to="/admin" active={!!isAdmin} icon={<Shield size={14} />}>Admin</NavPill>
               <NavPill to="/score" active={!!isScore} icon={<Crosshair size={14} />}>Scoring</NavPill>
+              <NavPill to="/mc" active={!!isMc} icon={<Mic size={14} />}>MC</NavPill>
               <NavPill to="/scoreboard" active={!!isScoreboard} icon={<BarChart3 size={14} />}>Scoreboard</NavPill>
               <ThemeToggle />
             </div>
@@ -232,6 +235,12 @@ const scoreboardRoute = createRoute({
   component: ScoreboardPage,
 });
 
+const mcRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/mc",
+  component: AnnouncerPage,
+});
+
 const routeTree = rootRoute.addChildren([
   indexRoute,
   adminRoute,
@@ -239,6 +248,7 @@ const routeTree = rootRoute.addChildren([
   scoreEventRoute,
   scoreCompetitorRoute,
   scoreboardRoute,
+  mcRoute,
 ]);
 
 export const router = createRouter({ routeTree, basepath: import.meta.env.BASE_URL });
