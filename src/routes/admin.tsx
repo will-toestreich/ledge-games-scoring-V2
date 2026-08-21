@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { Fragment, useEffect, useMemo, useState } from "react";
 import {
   Calendar,
   Users,
@@ -30,10 +30,12 @@ import {
   TrendingDown,
   Minus,
   Flag,
+  Scissors,
 } from "lucide-react";
 import { useRef } from "react";
 import { EventIcon } from "@/components/event-icons";
-import { CompetitorFormModal, SHIRT_SIZES } from "@/components/competitor-form";
+import { CompetitorFormModal } from "@/components/competitor-form";
+import { SHIRT_SIZES } from "@/lib/roster";
 import { CsvImportModal } from "@/components/csv-import";
 import { divisions, events, getDivision, roundLabel } from "@/data/competition-config";
 import type { AttemptScore, Competitor, DivisionId, EventConfig, EventId } from "@/lib/types";
@@ -43,6 +45,7 @@ import {
   eventProgress,
   pendingScorers,
   roundReadiness,
+  type CutInfo,
   type EventResults,
 } from "@/lib/scoring";
 import {
@@ -214,18 +217,22 @@ const sortValue: Record<SortKey, (c: Competitor) => string | number | boolean | 
   noShow: (c) => !c.noShow,
 };
 
-function SortableTh({
+/** Sortable table header — shared by the Competitors and Scores tables. */
+function SortableTh<K extends string>({
   label,
   sortKey,
   align = "left",
+  sub,
   sort,
   onSort,
 }: {
   label: string;
-  sortKey: SortKey;
+  sortKey: K;
   align?: "left" | "center";
-  sort: SortState;
-  onSort: (key: SortKey) => void;
+  /** Optional second line under the label (e.g. a round's cut label). */
+  sub?: string;
+  sort: { key: K; dir: 1 | -1 };
+  onSort: (key: K) => void;
 }) {
   const active = sort.key === sortKey;
   return (
@@ -243,6 +250,7 @@ function SortableTh({
           <ChevronsUpDown size={11} className="opacity-40" />
         )}
       </button>
+      {sub && <div className="text-[9px] normal-case font-normal">{sub}</div>}
     </th>
   );
 }
@@ -302,6 +310,9 @@ function CompetitorsTab() {
 
   const totalCheckedIn = competitors.filter((c) => c.checkedIn).length;
   const totalRegistered = competitors.filter((c) => c.registration !== null).length;
+  // A brand-new season has zero competitors — never divide by it
+  const rosterPct = (n: number) =>
+    competitors.length > 0 ? Math.round((n / competitors.length) * 100) : 0;
 
   function downloadTemplate() {
     const headers = ["Bib", "First Name", "Last Name", "Email", "Division (mens/womens/mentors)", "Nickname", "Hometown", "Shirt Size"];
@@ -329,7 +340,7 @@ function CompetitorsTab() {
             {totalRegistered} <span className="text-sm font-normal text-text-tertiary">/ {competitors.length}</span>
           </div>
           <div className="h-1.5 rounded-full bg-surface-overlay overflow-hidden mt-2">
-            <div className="h-full rounded-full bg-blue-500" style={{ width: `${Math.round((totalRegistered / competitors.length) * 100)}%` }} />
+            <div className="h-full rounded-full bg-blue-500" style={{ width: `${rosterPct(totalRegistered)}%` }} />
           </div>
         </div>
         <div className="card rounded-xl p-4">
@@ -338,7 +349,7 @@ function CompetitorsTab() {
             {totalCheckedIn} <span className="text-sm font-normal text-text-tertiary">/ {competitors.length}</span>
           </div>
           <div className="h-1.5 rounded-full bg-surface-overlay overflow-hidden mt-2">
-            <div className="h-full rounded-full bg-emerald-500" style={{ width: `${Math.round((totalCheckedIn / competitors.length) * 100)}%` }} />
+            <div className="h-full rounded-full bg-emerald-500" style={{ width: `${rosterPct(totalCheckedIn)}%` }} />
           </div>
         </div>
         {divisions.map((div) => {
@@ -557,6 +568,9 @@ function ScoresTab() {
   const eventDivs = activeDivisions.filter((d) => event.divisions[d.id]);
   const [divisionId, setDivisionId] = useState<DivisionId>(eventDivs[0].id);
   const activeDivId = eventDivs.some((d) => d.id === divisionId) ? divisionId : eventDivs[0].id;
+  // Quick filter — kept across event/division switches so you can chase one
+  // competitor's corrections through every event
+  const [search, setSearch] = useState("");
 
   return (
     <div className="space-y-5">
@@ -585,6 +599,18 @@ function ScoresTab() {
             {d.name}
           </FilterPill>
         ))}
+        {event.format !== "ladder" && (
+          <div className="relative ml-auto w-full sm:w-56">
+            <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-text-tertiary" />
+            <input
+              type="text"
+              placeholder="Search name or bib..."
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              className="input pl-9 py-2 text-sm"
+            />
+          </div>
+        )}
       </div>
 
       {event.format === "ladder" ? (
@@ -594,19 +620,32 @@ function ScoresTab() {
           it's safer to replay there than to edit raw cells here.
         </div>
       ) : (
-        <ScoreGrid event={event} divisionId={activeDivId} />
+        <ScoreGrid event={event} divisionId={activeDivId} search={search} />
       )}
     </div>
   );
 }
 
-function ScoreGrid({ event, divisionId }: { event: EventConfig; divisionId: DivisionId }) {
+function ScoreGrid({
+  event,
+  divisionId,
+  search,
+}: {
+  event: EventConfig;
+  divisionId: DivisionId;
+  search: string;
+}) {
   const division = getDivision(divisionId)!;
   const plan = event.divisions[divisionId]!;
   const { data: competitors } = useCompetitors();
   const { data: scores } = useScores();
   const { data: kegAttempts } = useKegAttempts();
   const [editing, setEditing] = useState<{ competitorId: string; round: number } | null>(null);
+  const [sort, setSort] = useState<{ key: string; dir: 1 | -1 }>({ key: "rank", dir: 1 });
+
+  function toggleSort(key: string) {
+    setSort((prev) => (prev.key === key ? { key, dir: prev.dir === 1 ? -1 : 1 } : { key, dir: 1 }));
+  }
 
   const field = useMemo(
     () => (competitors ? divisionField(divisionId, competitors) : []),
@@ -619,8 +658,55 @@ function ScoreGrid({ event, divisionId }: { event: EventConfig; divisionId: Divi
 
   if (!results || !scores) return null;
 
-  const ordered = [...results.results].sort((a, b) => (a.rank ?? 9999) - (b.rank ?? 9999));
   const byId = new Map(field.map((c) => [c.id, c]));
+  const q = search.trim().toLowerCase();
+
+  // Column sort: "rank" | "name" | "pts" | "r1".."rN"; nulls sink regardless
+  // of direction (an unscored round is never "lowest")
+  const sortVal = (r: EventResults["results"][number]): number | string | null => {
+    if (sort.key === "name") {
+      const c = byId.get(r.competitorId)!;
+      return `${c.firstName} ${c.lastName}`.toLowerCase();
+    }
+    if (sort.key === "pts") return r.points;
+    if (sort.key.startsWith("r") && sort.key !== "rank") return r.roundScores[Number(sort.key.slice(1)) - 1];
+    return r.rank;
+  };
+  const ordered = results.results
+    .filter((r) => {
+      if (!q) return true;
+      const c = byId.get(r.competitorId)!;
+      return (
+        `${c.firstName} ${c.lastName}`.toLowerCase().includes(q) ||
+        String(c.bibNumber).includes(q)
+      );
+    })
+    .sort((a, b) => {
+      const va = sortVal(a);
+      const vb = sortVal(b);
+      if (va !== vb) {
+        if (va === null) return 1;
+        if (vb === null) return -1;
+        if (va < vb) return -sort.dir;
+        if (va > vb) return sort.dir;
+      }
+      return (a.rank ?? 9999) - (b.rank ?? 9999); // stable fallback
+    });
+
+  // Cut lines: drawn only over the full field in rank order — a "line"
+  // inside a filtered or re-sorted list would be a lie. Locked cuts always
+  // show (the permanent record of where the line fell); the live projection
+  // shows once half the round is in, so it isn't just noise.
+  const cutAtIndex = new Map<number, CutInfo>();
+  if (!q && sort.key === "rank" && sort.dir === 1 && results.started) {
+    const firstUnlocked = results.cuts.find((c) => !c.locked);
+    for (const cut of results.cuts) {
+      if (!cut.locked && (cut !== firstUnlocked || cut.scoredCount / cut.eligibleCount < 0.5)) continue;
+      const advancing = new Set(cut.advancerIds);
+      const idx = ordered.findIndex((r) => !r.skipped && !advancing.has(r.competitorId));
+      if (idx > 0) cutAtIndex.set(idx, cut);
+    }
+  }
 
   return (
     <div className="card rounded-xl overflow-hidden">
@@ -628,39 +714,78 @@ function ScoreGrid({ event, divisionId }: { event: EventConfig; divisionId: Divi
         <table className="w-full text-sm">
           <thead>
             <tr className="border-b border-border-subtle">
-              <th className="px-3 py-3 text-left text-text-tertiary font-medium text-xs uppercase tracking-wider w-16">Rank</th>
-              <th className="px-3 py-3 text-left text-text-tertiary font-medium text-xs uppercase tracking-wider">Competitor</th>
+              <SortableTh label="Rank" sortKey="rank" sort={sort} onSort={toggleSort} />
+              <SortableTh label="Competitor" sortKey="name" sort={sort} onSort={toggleSort} />
               {plan.rounds.map((_, i) => (
-                <th key={i} className="px-2 py-3 text-center text-text-tertiary font-medium text-xs uppercase tracking-wider">
-                  Rd {i + 1}
-                  <div className="text-[9px] normal-case font-normal">{roundLabel(division, i + 1)}</div>
-                </th>
+                <SortableTh
+                  key={i}
+                  label={`Rd ${i + 1}`}
+                  sortKey={`r${i + 1}`}
+                  align="center"
+                  sub={roundLabel(division, i + 1)}
+                  sort={sort}
+                  onSort={toggleSort}
+                />
               ))}
-              <th className="px-3 py-3 text-center text-text-tertiary font-medium text-xs uppercase tracking-wider">Pts</th>
+              <SortableTh label="Pts" sortKey="pts" align="center" sort={sort} onSort={toggleSort} />
               <th className="px-3 py-3 text-center text-text-tertiary font-medium text-xs uppercase tracking-wider">Skip</th>
             </tr>
           </thead>
           <tbody>
-            {ordered.map((r) => {
+            {ordered.length === 0 && (
+              <tr>
+                <td colSpan={plan.rounds.length + 4} className="px-4 py-6 text-center text-sm text-text-tertiary">
+                  No competitors match “{search.trim()}”
+                </td>
+              </tr>
+            )}
+            {ordered.map((r, i) => {
               const c = byId.get(r.competitorId)!;
+              const cutHere = cutAtIndex.get(i);
               return (
-                <ScoreGridRow
-                  key={r.competitorId}
-                  event={event}
-                  competitor={c}
-                  result={r}
-                  plan={plan}
-                  scores={scores}
-                  color={division.color}
-                  editing={editing?.competitorId === r.competitorId ? editing.round : null}
-                  onEdit={(round) => setEditing(round === null ? null : { competitorId: r.competitorId, round })}
-                />
+                <Fragment key={r.competitorId}>
+                  {cutHere && <CutLineRow cut={cutHere} colSpan={plan.rounds.length + 4} />}
+                  <ScoreGridRow
+                    event={event}
+                    competitor={c}
+                    result={r}
+                    plan={plan}
+                    scores={scores}
+                    color={division.color}
+                    editing={editing?.competitorId === r.competitorId ? editing.round : null}
+                    onEdit={(round) => setEditing(round === null ? null : { competitorId: r.competitorId, round })}
+                  />
+                </Fragment>
               );
             })}
           </tbody>
         </table>
       </div>
     </div>
+  );
+}
+
+/** The cut line: dashed amber while projected, solid green once locked. */
+function CutLineRow({ cut, colSpan }: { cut: CutInfo; colSpan: number }) {
+  const tieExtra = cut.advancerIds.length - cut.target;
+  const ties = tieExtra > 0 ? ` (+${tieExtra} on ties)` : "";
+  const label = cut.locked
+    ? `Cut after Rd ${cut.afterRound} — top ${cut.target}${ties} advanced`
+    : `Projected cut — top ${cut.target}${ties} advance · ${cut.scoredCount}/${cut.eligibleCount} scored`;
+  const tone = cut.locked
+    ? { text: "text-emerald-400/90", line: "border-emerald-500/40" }
+    : { text: "text-amber-400", line: "border-dashed border-amber-500/50" };
+  return (
+    <tr>
+      <td colSpan={colSpan} className="px-4 py-1">
+        <div className={`flex items-center gap-2 text-[10px] font-semibold uppercase tracking-wider ${tone.text}`}>
+          <span className={`flex-1 border-t ${tone.line}`} />
+          <Scissors size={11} className="shrink-0" />
+          <span className="whitespace-nowrap">{label}</span>
+          <span className={`flex-1 border-t ${tone.line}`} />
+        </div>
+      </td>
+    </tr>
   );
 }
 
@@ -1003,7 +1128,7 @@ function SettingsTab() {
     run();
   }
 
-  async function downloadBackup() {
+  async function downloadBackup(label = "backup") {
     const json = await db.exportBackup();
     const blob = new Blob([json], { type: "application/json" });
     const url = URL.createObjectURL(blob);
@@ -1011,7 +1136,7 @@ function SettingsTab() {
     const d = new Date();
     const stamp = `${d.toISOString().slice(0, 10)}-${String(d.getHours()).padStart(2, "0")}${String(d.getMinutes()).padStart(2, "0")}`;
     a.href = url;
-    a.download = `ledge-games-backup-${stamp}.json`;
+    a.download = `ledge-games-${label}-${stamp}.json`;
     a.click();
     URL.revokeObjectURL(url);
   }
@@ -1037,6 +1162,9 @@ function SettingsTab() {
   async function applyRestore() {
     if (!restoreFile) return;
     try {
+      // Safety net: snapshot EVERYTHING to a download before replacing it,
+      // so a bad backup file or a mid-restore failure is always recoverable
+      await downloadBackup("pre-restore");
       await db.importBackup(restoreFile.raw);
       qc.invalidateQueries();
       setRestoreFile(null);
@@ -1158,7 +1286,7 @@ function SettingsTab() {
                 in this browser until the cloud backend exists.
               </p>
             </div>
-            <button onClick={downloadBackup} className="btn-primary text-xs py-1.5 px-3 inline-flex items-center gap-1.5 shrink-0">
+            <button onClick={() => downloadBackup()} className="btn-primary text-xs py-1.5 px-3 inline-flex items-center gap-1.5 shrink-0">
               <Download size={13} /> Download
             </button>
           </div>
@@ -1205,6 +1333,9 @@ function SettingsTab() {
                     Cancel
                   </button>
                 </div>
+                <p className="text-[11px] text-text-tertiary mt-2">
+                  A snapshot of the current data downloads first, so this is always undoable.
+                </p>
               </div>
             )}
           </div>
@@ -1425,8 +1556,12 @@ function MissionControlTab() {
   const { data: scores } = useScores();
   const { data: kegAttempts } = useKegAttempts();
   const { data: settings } = useSettings();
+  const { data: activeComp } = useActiveCompetition();
   const saveSettings = useSaveSettings();
   const activeDivisions = useActiveDivisions();
+  // An archived season is a final record, not a live operation: nothing is
+  // "owed", nothing advances, nothing stalls — those sections switch off
+  const isLive = activeComp?.status === "active";
   const mens = useDivisionScoring("mens");
   const womens = useDivisionScoring("womens");
   const mentors = useDivisionScoring("mentors");
@@ -1436,9 +1571,9 @@ function MissionControlTab() {
   const [chaseEvent, setChaseEvent] = useState<EventId | null>(null);
   // The stall clock compares against wall time: without a ticking re-render,
   // "last score 1m ago" would freeze exactly when scoring stops
-  const [, setClock] = useState(0);
+  const [now, setNow] = useState(() => Date.now());
   useEffect(() => {
-    const t = setInterval(() => setClock((c) => c + 1), 30_000);
+    const t = setInterval(() => setNow(Date.now()), 30_000);
     return () => clearInterval(t);
   }, []);
 
@@ -1566,6 +1701,13 @@ function MissionControlTab() {
 
   return (
     <div className="space-y-6">
+      {!isLive && (
+        <div className="flex items-center gap-2 rounded-xl border border-amber-500/30 bg-amber-500/10 px-4 py-2.5 text-sm text-amber-400">
+          <Clock size={16} className="shrink-0" />
+          Archived season — this is the final record. Unscored rounds are permanent gaps in
+          the data (a competitor who never threw), not scores waiting to be chased.
+        </div>
+      )}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
         <StatCard
           label="Events Underway"
@@ -1574,20 +1716,32 @@ function MissionControlTab() {
           icon={<Zap size={16} />}
           accent="#cc1a1a"
         />
-        <StatCard
-          label="Waiting On"
-          value={String(chaseRows.length)}
-          detail="competitors owe a score right now"
-          icon={<Megaphone size={16} />}
-          accent="#D97706"
-        />
-        <StatCard
-          label="Ready to Advance"
-          value={String(readiness.length)}
-          detail={readiness.some((r) => r.r.isFinals) ? "includes a finals cut" : "locked cuts to announce"}
-          icon={<Flag size={16} />}
-          accent="#059848"
-        />
+        {isLive ? (
+          <StatCard
+            label="Waiting On"
+            value={String(chaseRows.length)}
+            detail="competitors owe a score right now"
+            icon={<Megaphone size={16} />}
+            accent="#D97706"
+          />
+        ) : (
+          <StatCard
+            label="Record Gaps"
+            value={String(chaseRows.length)}
+            detail="competitors with unscored rounds (final)"
+            icon={<Megaphone size={16} />}
+            accent="#55556a"
+          />
+        )}
+        {isLive && (
+          <StatCard
+            label="Ready to Advance"
+            value={String(readiness.length)}
+            detail={readiness.some((r) => r.r.isFinals) ? "includes a finals cut" : "locked cuts to announce"}
+            icon={<Flag size={16} />}
+            accent="#059848"
+          />
+        )}
         <StatCard
           label="Checked In"
           value={String(competitors.filter((c) => c.checkedIn).length)}
@@ -1644,7 +1798,7 @@ function MissionControlTab() {
         )
       )}
 
-      {readiness.length > 0 && (
+      {isLive && readiness.length > 0 && (
         <div>
           <h3 className="text-sm font-semibold text-text-secondary uppercase tracking-wider mb-3">
             Ready to Move On
@@ -1695,7 +1849,7 @@ function MissionControlTab() {
         </div>
       )}
 
-      {chaseRows.length > 0 && (
+      {isLive && chaseRows.length > 0 && (
         <div>
           <h3 className="text-sm font-semibold text-text-secondary uppercase tracking-wider mb-3">
             Needs to Score <span className="text-text-tertiary normal-case">— most blocking first</span>
@@ -1747,6 +1901,17 @@ function MissionControlTab() {
                 <span className="font-medium text-sm text-text-primary w-28 sm:w-44 truncate">
                   {c.firstName} {c.lastName}
                 </span>
+                {/* A chased competitor who never checked in is usually a day
+                    no-show nobody scratched yet — surface it so the director
+                    marks them instead of chasing a ghost */}
+                {!c.checkedIn && (
+                  <span
+                    className="text-[10px] px-1.5 py-0.5 rounded border border-amber-500/30 bg-amber-500/10 text-amber-400"
+                    title="Not checked in — if they're a day no-show, mark No-show in Competitors to remove them from the field"
+                  >
+                    not checked in
+                  </span>
+                )}
                 <div className="flex flex-wrap gap-1.5 flex-1">
                   {items
                     .sort((a, b) => b.fraction - a.fraction)
@@ -1782,6 +1947,8 @@ function MissionControlTab() {
               byDiv={byDiv}
               pace={paceFor(event.id)}
               lastActivity={lastActivity.get(event.id)}
+              now={now}
+              live={isLive}
             />
           ))}
         </div>
@@ -1850,11 +2017,17 @@ function EventStatusCard({
   byDiv,
   pace,
   lastActivity,
+  now,
+  live,
 }: {
   event: EventConfig;
   byDiv: Record<DivisionId, ReturnType<typeof useDivisionScoring>>;
   pace: Pace;
   lastActivity?: number;
+  /** Wall clock from the ticking parent — keeps this component pure. */
+  now: number;
+  /** Archived seasons suppress pace/stall — a final record can't be behind. */
+  live: boolean;
 }) {
   const [expanded, setExpanded] = useState(false);
   const activeDivisions = useActiveDivisions();
@@ -1880,7 +2053,7 @@ function EventStatusCard({
   const anyStarted = details.some(({ res }) => res.started);
   const allDone = details.every(({ complete }) => complete);
   const totalOwed = details.reduce((n, d) => n + d.owed.length, 0);
-  const minsAgo = lastActivity ? Math.round((Date.now() - lastActivity) / 60_000) : null;
+  const minsAgo = live && lastActivity ? Math.round((now - lastActivity) / 60_000) : null;
   const stalled = anyStarted && !allDone && minsAgo !== null && minsAgo >= STALL_MINUTES;
 
   return (
@@ -1902,8 +2075,18 @@ function EventStatusCard({
           </div>
         </div>
         <div className="flex items-center gap-1.5 flex-wrap">
-          <PaceChip pace={pace} />
-          <StatusBadge status={allDone && anyStarted ? "complete" : anyStarted ? "in-progress" : "not-started"} />
+          {live && <PaceChip pace={pace} />}
+          <StatusBadge
+            status={
+              allDone && anyStarted
+                ? "complete"
+                : anyStarted
+                  ? live
+                    ? "in-progress"
+                    : "incomplete" // archived: gaps are final, nothing is "live"
+                  : "not-started"
+            }
+          />
         </div>
       </div>
 
@@ -1926,7 +2109,9 @@ function EventStatusCard({
             onClick={() => setExpanded(!expanded)}
             className="w-full flex items-center justify-between text-xs text-text-secondary hover:text-text-primary transition-colors pt-1"
           >
-            <span className="font-medium">waiting on {totalOwed} right now</span>
+            <span className="font-medium">
+              {live ? `waiting on ${totalOwed} right now` : `${totalOwed} unscored in the final record`}
+            </span>
             <ChevronDown size={14} className={`transition-transform duration-200 ${expanded ? "rotate-180" : ""}`} />
           </button>
           {expanded && (
@@ -1991,6 +2176,14 @@ function StatusBadge({ status }: { status: string }) {
     return (
       <span className="inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full bg-emerald-500/15 text-emerald-400">
         <CheckCircle2 size={10} /> Done
+      </span>
+    );
+  }
+  if (status === "incomplete") {
+    // Archived season with gaps: neutral, no "live" pulse implied
+    return (
+      <span className="inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full bg-surface-overlay text-text-tertiary">
+        <Minus size={10} /> Incomplete
       </span>
     );
   }
