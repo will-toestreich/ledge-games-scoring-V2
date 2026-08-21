@@ -6,6 +6,7 @@ import {
   eventProgress,
   kegCompetitorState,
   pendingScorers,
+  projectedCut,
   roundReadiness,
 } from "./scoring";
 import type {
@@ -354,6 +355,27 @@ describe("cut line info", () => {
     const noCuts: Division = { ...div2, cutsAfterRound: {} };
     const res = run(pointsEvent(), [comp("a")], [score("a", 1, 1, 5)], noCuts);
     expect(res.cuts).toEqual([]);
+  });
+
+  it("projectedCut: null below half-scored, the live cut above, null once locked", () => {
+    const field = ["a", "b", "c", "d"].map((id) => comp(id));
+    // 1 of 4 scored — under the display threshold
+    expect(projectedCut(run(pointsEvent(), field, [score("a", 1, 1, 50)]))).toBeNull();
+    // 3 of 4 — projection shows
+    const mid = run(pointsEvent(), field, [
+      score("a", 1, 1, 50),
+      score("b", 1, 1, 40),
+      score("c", 1, 1, 30),
+    ]);
+    expect(projectedCut(mid)?.bubbleScore).toBe(40);
+    // Fully scored — the cut locks; nothing left to project (round 2 has no cut)
+    const done = run(pointsEvent(), field, [
+      score("a", 1, 1, 50),
+      score("b", 1, 1, 40),
+      score("c", 1, 1, 30),
+      score("d", 1, 1, 20),
+    ]);
+    expect(projectedCut(done)).toBeNull();
   });
 });
 

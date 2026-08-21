@@ -4,10 +4,10 @@ import { Shield, Crosshair, Mic, Sun, Moon, Swords } from "lucide-react";
 import { useTheme } from "@/lib/theme";
 import { EventIcon } from "@/components/event-icons";
 import { BrandLogo } from "@/components/brand-logo";
-import { divisionEvents } from "@/data/competition-config";
+import { divisionEvents, getEvent } from "@/data/competition-config";
 import { useActiveCompetition, useActiveDivisions, useDivisionScoring, useSettings } from "@/data/hooks";
 import type { Division, DivisionId, EventId } from "@/lib/types";
-import { eventProgress, type Standing } from "@/lib/scoring";
+import { eventProgress, projectedCut, type Standing } from "@/lib/scoring";
 
 function ScoreboardThemeToggle() {
   const { theme, toggle } = useTheme();
@@ -277,6 +277,10 @@ function EventStrip({ compact = false }: { compact?: boolean }) {
     mentors: useDivisionScoring("mentors"),
   };
   const activeDivisions = useActiveDivisions();
+  // Projections are for LIVE competitions — an archived season's unlocked
+  // cut is a historical gap, not a forecast
+  const { data: activeComp } = useActiveCompetition();
+  const isLive = activeComp?.status === "active";
   const allEvents = [...new Set(activeDivisions.flatMap((d) => divisionEvents(d.id).map((e) => e.id)))];
 
   return (
@@ -304,31 +308,46 @@ function EventStrip({ compact = false }: { compact?: boolean }) {
                 }
                 const p = eventProgress(res);
                 const isComplete = p.complete;
+                const event = getEvent(eventId)!;
+                const cut = isLive ? projectedCut(res) : null;
+                const cutTies = cut && cut.advancerIds.length > cut.target ? `+${cut.advancerIds.length - cut.target}` : "";
                 return (
-                  <div key={div.id} className="flex items-center gap-1">
-                    <span className="w-1.5 h-1.5 rounded-full shrink-0" style={{ backgroundColor: div.color }} />
-                    <span className="font-medium text-text-primary shrink-0 truncate" style={{ fontSize: "clamp(8px, 0.5vw, 10px)", width: "clamp(28px, 3vw, 48px)" }}>
-                      {div.name}
-                    </span>
-                    <span className="font-mono text-text-secondary shrink-0" style={{ fontSize: "clamp(7px, 0.45vw, 9px)" }}>
-                      {p.label}
-                    </span>
-                    <div className="flex-1 h-1 rounded-full bg-surface-overlay overflow-hidden">
-                      <div
-                        className="h-full rounded-full transition-all duration-500"
-                        style={{
-                          width: `${p.pct}%`,
-                          backgroundColor: isComplete ? "#34d399" : div.color,
-                          boxShadow: p.pct > 0 ? `0 0 6px ${isComplete ? "#34d39960" : div.color + "60"}` : "none",
-                        }}
-                      />
+                  <div key={div.id}>
+                    <div className="flex items-center gap-1">
+                      <span className="w-1.5 h-1.5 rounded-full shrink-0" style={{ backgroundColor: div.color }} />
+                      <span className="font-medium text-text-primary shrink-0 truncate" style={{ fontSize: "clamp(8px, 0.5vw, 10px)", width: "clamp(28px, 3vw, 48px)" }}>
+                        {div.name}
+                      </span>
+                      <span className="font-mono text-text-secondary shrink-0" style={{ fontSize: "clamp(7px, 0.45vw, 9px)" }}>
+                        {p.label}
+                      </span>
+                      <div className="flex-1 h-1 rounded-full bg-surface-overlay overflow-hidden">
+                        <div
+                          className="h-full rounded-full transition-all duration-500"
+                          style={{
+                            width: `${p.pct}%`,
+                            backgroundColor: isComplete ? "#34d399" : div.color,
+                            boxShadow: p.pct > 0 ? `0 0 6px ${isComplete ? "#34d39960" : div.color + "60"}` : "none",
+                          }}
+                        />
+                      </div>
+                      <span
+                        className={`font-mono text-right shrink-0 ${isComplete ? "text-emerald-400" : "text-text-secondary"}`}
+                        style={{ fontSize: "clamp(7px, 0.45vw, 10px)", width: "clamp(26px, 2.6vw, 44px)" }}
+                      >
+                        {p.detail ?? `${p.pct}%`}
+                      </span>
                     </div>
-                    <span
-                      className={`font-mono text-right shrink-0 ${isComplete ? "text-emerald-400" : "text-text-secondary"}`}
-                      style={{ fontSize: "clamp(7px, 0.45vw, 10px)", width: "clamp(26px, 2.6vw, 44px)" }}
-                    >
-                      {p.detail ?? `${p.pct}%`}
-                    </span>
+                    {/* Live projected cut: moves with every score until the round locks */}
+                    {cut && (
+                      <div
+                        className="text-right font-mono text-amber-400"
+                        style={{ fontSize: "clamp(7px, 0.45vw, 9px)", paddingLeft: "clamp(34px, 3.4vw, 58px)" }}
+                      >
+                        ✂ top {cut.target}
+                        {cutTies} · {cut.bubbleScore!.toFixed(event.decimals)} {event.unit}
+                      </div>
+                    )}
                   </div>
                 );
               })}
@@ -602,6 +621,8 @@ function Metric({ label, value, accent }: { label: string; value: string; accent
 
 function DivisionDetail({ divisionId }: { divisionId: DivisionId }) {
   const { data } = useDivisionScoring(divisionId);
+  const { data: activeComp } = useActiveCompetition();
+  const isLive = activeComp?.status === "active";
   if (!data) return null;
   const div = data.division;
   const events = divisionEvents(divisionId);
@@ -636,6 +657,7 @@ function DivisionDetail({ divisionId }: { divisionId: DivisionId }) {
           {events.map((event) => {
             const res = data.eventResults.get(event.id)!;
             const p = eventProgress(res);
+            const cut = isLive ? projectedCut(res) : null;
             const first = res.results.find((r) => r.rank === 1 && r.participated);
             const firstComp = first && byId.get(first.competitorId);
             const display = first
@@ -662,6 +684,15 @@ function DivisionDetail({ divisionId }: { divisionId: DivisionId }) {
                   {firstComp ? `${firstComp.firstName} ${firstComp.lastName}` : "—"}
                 </div>
                 <div className="text-[10px] font-mono text-text-tertiary mt-0.5">{display}</div>
+                {cut && (
+                  <div
+                    className="text-[10px] font-mono text-amber-400 mt-1"
+                    title={`Projected cut after Rd ${cut.afterRound}: top ${cut.target}${cut.advancerIds.length > cut.target ? ` (+${cut.advancerIds.length - cut.target} on ties)` : ""} advance · ${cut.scoredCount}/${cut.eligibleCount} scored — moves until the round completes`}
+                  >
+                    ✂ cut: top {cut.target}
+                    {cut.advancerIds.length > cut.target ? `+${cut.advancerIds.length - cut.target}` : ""} · {cut.bubbleScore!.toFixed(event.decimals)} {event.unit}
+                  </div>
+                )}
               </div>
             );
           })}

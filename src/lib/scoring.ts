@@ -594,6 +594,19 @@ export function eventProgress(res: EventResults): EventProgress {
   };
 }
 
+/**
+ * The live cut projection worth displaying: the first unlocked cut, once at
+ * least half of its round is scored (below that, everyone unscored sits under
+ * the line and the "projection" is noise). Null for ladder events, no-cut
+ * divisions, unstarted events, and rounds still under the threshold.
+ */
+export function projectedCut(res: EventResults): CutInfo | null {
+  if (!res.started) return null;
+  const cut = res.cuts.find((c) => !c.locked);
+  if (!cut || cut.eligibleCount === 0 || cut.bubbleScore === null) return null;
+  return cut.scoredCount / cut.eligibleCount >= 0.5 ? cut : null;
+}
+
 // ─── Mission Control: who's blocking, what's ready ─────────
 
 export interface PendingScorers {
