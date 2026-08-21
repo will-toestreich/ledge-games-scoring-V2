@@ -31,6 +31,7 @@ import {
   Minus,
   Flag,
   Scissors,
+  Eraser,
 } from "lucide-react";
 import { useRef } from "react";
 import { EventIcon } from "@/components/event-icons";
@@ -60,6 +61,7 @@ import {
   useDivisionScoring,
   useKegAttempts,
   useRenameCompetition,
+  useResetActiveSeasonScores,
   useResetDemoData,
   useSaveRoundAttempts,
   useDeleteRoundAttempts,
@@ -1153,10 +1155,14 @@ function SettingsTab() {
   const { data: settings } = useSettings();
   const saveSettings = useSaveSettings();
   const resetDemo = useResetDemoData();
+  const resetScores = useResetActiveSeasonScores();
   const qc = useQueryClient();
   const [pin, setPin] = useState<string | null>(null);
   const { data: competitors } = useCompetitors();
+  const { data: scores } = useScores();
+  const { data: kegAttempts } = useKegAttempts();
   const [confirmData, setConfirmData] = useState<"demo" | "2025" | null>(null);
+  const [confirmScoreReset, setConfirmScoreReset] = useState(false);
   const restoreInputRef = useRef<HTMLInputElement>(null);
   const [restoreFile, setRestoreFile] = useState<{ name: string; raw: string; seasons: string[] } | null>(null);
   const [restoreError, setRestoreError] = useState<string | null>(null);
@@ -1379,6 +1385,52 @@ function SettingsTab() {
                 <p className="text-[11px] text-text-tertiary mt-2">
                   A snapshot of the current data downloads first, so this is always undoable.
                 </p>
+              </div>
+            )}
+          </div>
+          {/* Reset scores — the "clear the test scoring, run the real day" tool.
+              Double opt-in: arm the button, then confirm against live counts;
+              a backup auto-downloads before anything is deleted. */}
+          <div className="pb-3 border-b border-border-subtle">
+            <div className="flex items-center justify-between gap-4">
+              <div>
+                <div className="font-medium text-sm text-text-primary">Reset active season scores</div>
+                <p className="text-xs text-text-secondary">
+                  Deletes every recorded score and keg attempt in the active season.
+                  Roster, check-ins, and event skips are kept.
+                </p>
+              </div>
+              <button
+                onClick={() => setConfirmScoreReset(true)}
+                disabled={confirmScoreReset}
+                className="btn-secondary text-xs py-1.5 px-3 inline-flex items-center gap-1.5 shrink-0"
+              >
+                <Eraser size={13} /> Reset scores…
+              </button>
+            </div>
+            {confirmScoreReset && (
+              <div className="mt-3 rounded-lg border border-red-500/30 bg-red-500/10 p-3">
+                <p className="text-xs text-red-400 font-medium mb-2.5">
+                  This permanently deletes {scores?.length ?? 0} scores and {kegAttempts?.length ?? 0} keg
+                  attempts from “{settings.competitionName} {settings.year}”, and clears any recorded
+                  arrow-off. The roster ({competitors?.length ?? 0} competitors) is untouched.
+                  A backup of everything downloads first.
+                </p>
+                <div className="flex gap-2">
+                  <button
+                    onClick={async () => {
+                      await downloadBackup("pre-score-reset");
+                      resetScores.mutate(undefined, { onSuccess: () => setConfirmScoreReset(false) });
+                    }}
+                    disabled={resetScores.isPending}
+                    className="text-xs font-medium px-3 py-1.5 rounded-lg bg-red-500 text-white"
+                  >
+                    {resetScores.isPending ? "Deleting…" : "Yes — delete all scores"}
+                  </button>
+                  <button onClick={() => setConfirmScoreReset(false)} className="btn-secondary text-xs py-1.5 px-3">
+                    Cancel
+                  </button>
+                </div>
               </div>
             )}
           </div>

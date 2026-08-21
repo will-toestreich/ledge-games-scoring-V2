@@ -163,6 +163,14 @@ export function useSaveSettings() {
   });
 }
 
+export function useResetActiveSeasonScores() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: () => db.resetActiveSeasonScores(),
+    onSuccess: () => qc.invalidateQueries(),
+  });
+}
+
 export function useResetDemoData() {
   const qc = useQueryClient();
   return useMutation({

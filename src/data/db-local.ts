@@ -393,6 +393,20 @@ export async function importBackup(raw: string): Promise<{ competitions: number 
 
 // ─── Dataset tools (operate on the ACTIVE competition) ─────
 
+/**
+ * Delete every score and keg attempt in the ACTIVE season. Roster,
+ * check-ins, and event skips are kept — this is the "clear the test
+ * scoring, run the real day" tool. Arrow-off results are score artifacts,
+ * so they clear too.
+ */
+export async function resetActiveSeasonScores(): Promise<void> {
+  const comp = active();
+  comp.scores = [];
+  comp.kegAttempts = [];
+  delete comp.settings.titleTiebreakWinners;
+  persist();
+}
+
 /** Replace the active competition's data with the synthetic demo dataset. */
 export async function resetDemoData(): Promise<void> {
   const comp = active();

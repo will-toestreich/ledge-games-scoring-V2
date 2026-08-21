@@ -597,6 +597,18 @@ export async function saveSettings(patch: Partial<Settings>): Promise<void> {
 
 // ─── Dataset tools ─────────────────────────────────────────
 
+/**
+ * Delete every score and keg attempt in the ACTIVE season (roster kept).
+ * Arrow-off results are score artifacts, so they clear too.
+ */
+export async function resetActiveSeasonScores(): Promise<void> {
+  const id = await getActiveId();
+  fail((await sb().from("v2_scores").delete().eq("competition_id", id)).error);
+  fail((await sb().from("v2_keg_attempts").delete().eq("competition_id", id)).error);
+  fail((await sb().from("v2_competitions").update({ title_tiebreak_winners: {} }).eq("id", id)).error);
+  emitUpdated();
+}
+
 async function replaceActiveData(data: SeasonData, keepPin: boolean): Promise<void> {
   const id = await getActiveId();
   fail((await sb().from("v2_scores").delete().eq("competition_id", id)).error);

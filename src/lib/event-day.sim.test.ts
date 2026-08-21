@@ -604,4 +604,17 @@ describe("mock event day (full simulation through the real adapter)", () => {
 
     console.log("\n══ MOCK EVENT OBSERVATIONS ══\n" + OBSERVATIONS.map((o) => "• " + o).join("\n"));
   });
+
+  it("phase 8 — reset active season scores: scores gone, roster kept, tiebreak cleared", async () => {
+    const rosterBefore = (await db.fetchCompetitors()).length;
+    expect((await db.fetchScores()).length).toBeGreaterThan(0);
+    await db.resetActiveSeasonScores();
+    expect(await db.fetchScores()).toEqual([]);
+    expect(await db.fetchKegAttempts()).toEqual([]);
+    expect((await db.fetchCompetitors()).length).toBe(rosterBefore);
+    expect((await db.fetchSettings()).titleTiebreakWinners?.mentors).toBeUndefined();
+    // The archived 2025 season is untouched — only the ACTIVE season resets
+    const comps = await db.fetchCompetitions();
+    expect(comps.find((c) => c.id === "season-2025")!.competitorCount).toBeGreaterThan(0);
+  });
 });
