@@ -2241,7 +2241,9 @@ function EventStatusCard({
           const ties = cut && cut.advancerIds.length > cut.target ? `+${cut.advancerIds.length - cut.target}` : "";
           return (
             <div key={d.id} className="flex-1 text-center">
-              <div className="text-[10px] text-text-tertiary uppercase tracking-wider mb-1">{d.name.slice(0, 3)}</div>
+              {/* Drop the possessive, not the tail — slice(0,3) made both
+                  "Men's" and "Mentors" read MEN */}
+              <div className="text-[10px] text-text-tertiary uppercase tracking-wider mb-1">{d.name.replace("'s", "")}</div>
               <div className="h-1 rounded-full bg-surface-overlay overflow-hidden">
                 <div className="h-full rounded-full" style={{ width: `${pct}%`, backgroundColor: d.color }} />
               </div>
