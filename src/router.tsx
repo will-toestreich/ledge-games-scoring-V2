@@ -145,8 +145,10 @@ function LandingPage() {
         <BrandLogo className="h-auto w-full max-w-[300px] sm:max-w-[420px] md:max-w-[520px] mx-auto drop-shadow-2xl" />
 
         <div className="space-y-2 sm:space-y-3">
+          {/* Name the active season, not just its year — "2000 Competition
+              Scoring" (a test season) confused even the event director */}
           <p className="text-text-secondary text-lg tracking-wide">
-            {settings ? `${settings.year} Competition Scoring` : "Competition Scoring"}
+            {settings ? `${settings.competitionName} · ${settings.year}` : "Competition Scoring"}
           </p>
           <p className="text-text-tertiary text-sm">Pick your weapon.</p>
         </div>
