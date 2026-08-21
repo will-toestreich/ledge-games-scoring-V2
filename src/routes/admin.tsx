@@ -2160,12 +2160,22 @@ function EventStatusCard({
     const p = eventProgress(res);
     const owed = pendingScorers(res);
     const byId = new Map(data.field.map((c) => [c.id, c]));
+    // Live cut projection: the first unlocked cut, once half its round is in.
+    // It moves with every score until the round completes and it locks
+    // (locked cuts get announced in "Ready to Move On").
+    const proj = live ? res.cuts.find((c) => !c.locked) : undefined;
+    const projReady =
+      proj !== undefined &&
+      proj.eligibleCount > 0 &&
+      proj.scoredCount / proj.eligibleCount >= 0.5 &&
+      proj.bubbleScore !== null;
     return {
       division: d,
       res,
       pct: p.pct,
       label: p.detail ? `${p.label} · ${p.detail}` : p.label,
       complete: p.complete,
+      cut: projReady ? proj : undefined,
       owedLabel: owed?.label,
       owed: owed ? owed.competitorIds.map((id) => byId.get(id)!).filter(Boolean) : [],
     };
@@ -2212,16 +2222,29 @@ function EventStatusCard({
       </div>
 
       <div className="flex gap-2">
-        {details.map(({ division: d, pct, label }) => (
-          <div key={d.id} className="flex-1 text-center">
-            <div className="text-[10px] text-text-tertiary uppercase tracking-wider mb-1">{d.name.slice(0, 3)}</div>
-            <div className="h-1 rounded-full bg-surface-overlay overflow-hidden">
-              <div className="h-full rounded-full" style={{ width: `${pct}%`, backgroundColor: d.color }} />
+        {details.map(({ division: d, pct, label, cut }) => {
+          const ties = cut && cut.advancerIds.length > cut.target ? `+${cut.advancerIds.length - cut.target}` : "";
+          return (
+            <div key={d.id} className="flex-1 text-center">
+              <div className="text-[10px] text-text-tertiary uppercase tracking-wider mb-1">{d.name.slice(0, 3)}</div>
+              <div className="h-1 rounded-full bg-surface-overlay overflow-hidden">
+                <div className="h-full rounded-full" style={{ width: `${pct}%`, backgroundColor: d.color }} />
+              </div>
+              <div className="text-[10px] text-text-tertiary mt-0.5 font-mono">{pct}%</div>
+              <div className="text-[9px] text-text-tertiary mt-0.5">{label}</div>
+              {cut && (
+                <div
+                  className="text-[9px] text-amber-400 mt-0.5 inline-flex items-center gap-0.5 font-mono"
+                  title={`Projected cut after Rd ${cut.afterRound}: top ${cut.target}${ties && ` (${ties} on ties)`} advance · line at ${cut.bubbleScore!.toFixed(event.decimals)} ${event.unit} · ${cut.scoredCount}/${cut.eligibleCount} scored — keeps moving until the round is fully scored`}
+                >
+                  <Scissors size={9} className="shrink-0" />
+                  top {cut.target}
+                  {ties} · {cut.bubbleScore!.toFixed(event.decimals)} {event.unit}
+                </div>
+              )}
             </div>
-            <div className="text-[10px] text-text-tertiary mt-0.5 font-mono">{pct}%</div>
-            <div className="text-[9px] text-text-tertiary mt-0.5">{label}</div>
-          </div>
-        ))}
+          );
+        })}
       </div>
 
       {totalOwed > 0 && (
