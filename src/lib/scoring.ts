@@ -41,6 +41,23 @@ export interface EventResult {
   points: number | null;
 }
 
+/** One cut line — final once locked, a live projection until then. */
+export interface CutInfo {
+  /** The cut applies after this round completes. */
+  afterRound: number;
+  /** Top-N target before tie extension ("one tie, all tie" can add more). */
+  target: number;
+  /** True once the round is fully scored and the cut is applied for real. */
+  locked: boolean;
+  /** Advancing competitor ids — final when locked, else the live projection. */
+  advancerIds: string[];
+  /** Cumulative score of the last competitor inside the line (null pre-scores). */
+  bubbleScore: number | null;
+  /** How many of the round's eligible field have fully scored the round. */
+  scoredCount: number;
+  eligibleCount: number;
+}
+
 export interface EventResults {
   eventId: EventId;
   divisionId: string;
@@ -54,6 +71,8 @@ export interface EventResults {
   byCompetitor: Map<string, EventResult>;
   /** Competitor ids eligible for each round (index round-1). Rounds format only. */
   eligibleByRound: string[][];
+  /** Cut lines in round order — locked ones are final, unlocked are live projections. */
+  cuts: CutInfo[];
   /** Planned attempts per round from the division's plan (rounds format only). */
   attemptsPlanned: number[];
   /** Highest round with any recorded score (0 = not started). */
@@ -63,6 +82,8 @@ export interface EventResults {
     height: number;
     done: number;
     remaining: number;
+    /** Contenders not yet eliminated at ANY height (drives event completeness). */
+    alive: number;
     /** Survivors who still owe an outcome at the current bar. */
     pending: string[];
   };
@@ -199,11 +220,14 @@ function computeRoundsEvent(
   };
 
   // Advancement: everyone contends round 1. A cut only LOCKS once its round
-  // is fully scored — computing cuts from partial data would cascade the few
+  // is fully scored — applying cuts to partial data would cascade the few
   // scored competitors straight into a phantom "finals" and (via the finals
   // reset) tie them all at rank 1 while round 1 is still being thrown.
+  // The cut RANKING is computed either way, so views can draw a projected
+  // line that is guaranteed to agree with the real cut the moment it locks.
   const eligibleByRound: string[][] = [contenders.map((c) => c.id)];
   const appliedCuts: boolean[] = []; // index r-1: cut after round r executed
+  const cuts: CutInfo[] = [];
   for (let r = 1; r < nRounds; r++) {
     const cut = division.cutsAfterRound[r];
     const current = eligibleByRound[r - 1];
@@ -211,7 +235,7 @@ function computeRoundsEvent(
       started &&
       current.length > 0 &&
       current.every((id) => roundCompleteById.get(id)![r - 1]);
-    if (cut === undefined || !roundDone) {
+    if (cut === undefined) {
       appliedCuts.push(false);
       eligibleByRound.push([...current]);
       continue;
@@ -225,7 +249,26 @@ function computeRoundsEvent(
     }));
     const ranks = assignGolfRanks(entries);
     // One tie, all tie: everyone ranked within the target advances
-    eligibleByRound.push(current.filter((id) => ranks.get(id)! <= target));
+    const advancers = current.filter((id) => ranks.get(id)! <= target);
+    const bubbleId =
+      advancers.length > 0
+        ? advancers.reduce((worst, id) => (ranks.get(id)! > ranks.get(worst)! ? id : worst), advancers[0])
+        : null;
+    cuts.push({
+      afterRound: r,
+      target,
+      locked: roundDone,
+      advancerIds: advancers,
+      bubbleScore: started && bubbleId !== null ? cumulativeThrough(bubbleId, r) : null,
+      scoredCount: current.filter((id) => roundCompleteById.get(id)![r - 1]).length,
+      eligibleCount: current.length,
+    });
+    if (!roundDone) {
+      appliedCuts.push(false);
+      eligibleByRound.push([...current]);
+      continue;
+    }
+    eligibleByRound.push(advancers);
     appliedCuts.push(true);
   }
 
@@ -313,6 +356,7 @@ function computeRoundsEvent(
     byCompetitor: new Map(results.map((r) => [r.competitorId, r])),
     hasCuts,
     eligibleByRound,
+    cuts,
     attemptsPlanned: plan.rounds.map((r) => r.attempts),
     currentRound,
   };
@@ -384,8 +428,10 @@ function computeLadderEvent(
   const barHeight = attempts.reduce((m, a) => Math.max(m, a.heightFt), ladder.startHeight);
   let remaining = 0;
   let done = 0;
+  let alive = 0;
   const pending: string[] = [];
   for (const st of states.values()) {
+    if (!st.out) alive++;
     const heights = new Map<number, KegAttempt[]>();
     for (const a of st.attempts) {
       if (!heights.has(a.heightFt)) heights.set(a.heightFt, []);
@@ -460,9 +506,10 @@ function computeLadderEvent(
     byCompetitor: new Map(results.map((r) => [r.competitorId, r])),
     hasCuts: false,
     eligibleByRound: [],
+    cuts: [],
     attemptsPlanned: [],
     currentRound: 0,
-    ladderStatus: { height: barHeight, done, remaining, pending },
+    ladderStatus: { height: barHeight, done, remaining, alive, pending },
   };
 }
 
@@ -487,9 +534,12 @@ export function eventProgress(res: EventResults): EventProgress {
   if (!res.started) return { pct: 0, label: "not started", complete: false, started: false };
 
   if (res.ladderStatus) {
-    const { height, done, remaining } = res.ladderStatus;
-    // Ladder is decided once at most one contender is still in the hunt
-    const complete = remaining <= 1;
+    const { height, done, remaining, alive } = res.ladderStatus;
+    // Ladder is decided once at most one contender is still in the hunt —
+    // "alive" (not eliminated anywhere), NOT "remaining at the bar": when the
+    // last survivors all miss out at the same height they still count as
+    // remaining there, and the event would otherwise never read complete
+    const complete = alive <= 1;
     return {
       pct: complete ? 100 : remaining > 0 ? Math.round((done / remaining) * 100) : 100,
       // "at 11 ft · 4/69" = of the 69 still alive, 4 have resolved this bar

@@ -3,6 +3,7 @@ import {
   computeEventResults,
   computeStandings,
   divisionField,
+  eventProgress,
   kegCompetitorState,
   pendingScorers,
   roundReadiness,
@@ -307,6 +308,55 @@ describe("cuts and strata", () => {
   });
 });
 
+// ─── Cut lines (projected + locked) ────────────────────────
+
+describe("cut line info", () => {
+  it("projects the cut mid-round without applying it", () => {
+    const field = ["a", "b", "c", "d"].map((id) => comp(id));
+    const res = run(pointsEvent(), field, [
+      score("a", 1, 1, 50),
+      score("b", 1, 1, 40),
+      score("c", 1, 1, 30),
+      // d hasn't thrown round 1 yet
+    ]);
+    expect(res.cuts).toHaveLength(1);
+    const cut = res.cuts[0];
+    expect(cut.afterRound).toBe(1);
+    expect(cut.locked).toBe(false);
+    expect(cut.target).toBe(2); // half of 4
+    expect([...cut.advancerIds].sort()).toEqual(["a", "b"]);
+    expect(cut.bubbleScore).toBe(40); // last competitor inside the line
+    expect(cut.scoredCount).toBe(3);
+    expect(cut.eligibleCount).toBe(4);
+    // The projection never cuts anyone early
+    expect(res.eligibleByRound[1]).toHaveLength(4);
+  });
+
+  it("locks when the round completes; ties extend past the target; agrees with the real cut", () => {
+    // 5 competitors → top 3; c and d tie at the line → 4 advance
+    const field = ["a", "b", "c", "d", "e"].map((id) => comp(id));
+    const res = run(pointsEvent(), field, [
+      score("a", 1, 1, 50),
+      score("b", 1, 1, 40),
+      score("c", 1, 1, 30),
+      score("d", 1, 1, 30),
+      score("e", 1, 1, 10),
+    ]);
+    const cut = res.cuts[0];
+    expect(cut.locked).toBe(true);
+    expect(cut.target).toBe(3);
+    expect([...cut.advancerIds].sort()).toEqual(["a", "b", "c", "d"]);
+    expect(cut.advancerIds).toEqual(res.eligibleByRound[1]); // line = the actual cut
+    expect(cut.bubbleScore).toBe(30);
+  });
+
+  it("no-cut divisions and ladder events expose no cut lines", () => {
+    const noCuts: Division = { ...div2, cutsAfterRound: {} };
+    const res = run(pointsEvent(), [comp("a")], [score("a", 1, 1, 5)], noCuts);
+    expect(res.cuts).toEqual([]);
+  });
+});
+
 // ─── No-shows and field definition ─────────────────────────
 
 describe("day no-shows", () => {
@@ -386,7 +436,25 @@ describe("keg ladder", () => {
       keg("c", 11, 1, "clear"),
       keg("c", 12, 1, "pass"), // c: resolved at 12
     ]);
-    expect(res.ladderStatus).toEqual({ height: 12, done: 1, remaining: 2, pending: ["a"] });
+    expect(res.ladderStatus).toEqual({ height: 12, done: 1, remaining: 2, alive: 2, pending: ["a"] });
+  });
+
+  it("event completes when the last survivors all miss out at the final height", () => {
+    // Regression: both finalists going out at the same bar left them counted
+    // as "remaining" there, so the event never read complete
+    const field = ["a", "b"].map((id) => comp(id));
+    const res = run(kegEvent, field, [], div2, [
+      keg("a", 10, 1, "clear"),
+      keg("a", 11, 1, "miss"),
+      keg("a", 11, 2, "miss"),
+      keg("b", 10, 1, "clear"),
+      keg("b", 11, 1, "miss"),
+      keg("b", 11, 2, "miss"),
+    ]);
+    expect(eventProgress(res).complete).toBe(true);
+    expect(pendingScorers(res)).toBeNull();
+    expect(res.byCompetitor.get("a")!.points).toBe(1); // tied at 10 ft
+    expect(res.byCompetitor.get("b")!.points).toBe(1);
   });
 
   it("two misses at a height puts you out; state tracks it", () => {
