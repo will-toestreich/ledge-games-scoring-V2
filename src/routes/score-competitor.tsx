@@ -32,9 +32,22 @@ export function ScoreCompetitorPage() {
   // deep-link/reload shows a scored round as blank and invites an overwrite
   if (!competitor || !scores) return null;
 
+  // Clamp deep-linked rounds into this division's plan so a stale URL can't
+  // point past the last round
+  const plan = event.divisions[competitor.divisionId];
+  const round = Math.max(1, Math.min(search.round ?? 1, plan?.rounds.length ?? 1));
+
   return (
     <ScorerGate>
-      <ScoreEntry event={event} competitorId={competitor.id} round={search.round ?? 1} />
+      {/* Keyed so draft state never survives a competitor/round change in
+          place (browser back/forward) — stale values would save under the
+          wrong competitor or round */}
+      <ScoreEntry
+        key={`${competitor.id}:${event.id}:r${round}`}
+        event={event}
+        competitorId={competitor.id}
+        round={round}
+      />
     </ScorerGate>
   );
 }

@@ -1,6 +1,6 @@
-import { useMemo, useState } from "react";
+import { useState } from "react";
 import { Link } from "@tanstack/react-router";
-import { ChevronLeft, ChevronUp, ChevronDown, Undo2, Check, X, FastForward } from "lucide-react";
+import { ChevronLeft, ChevronUp, ChevronDown, Undo2, Check, X, FastForward, Scissors } from "lucide-react";
 import { useParams } from "@tanstack/react-router";
 import { divisions, getEvent, roundLabel } from "@/data/competition-config";
 import type { Competitor, DivisionId, EventConfig, KegAttempt } from "@/lib/types";
@@ -52,21 +52,21 @@ function EventScoring({ event }: { event: EventConfig }) {
   const scores = useScores();
   const kegAttempts = useKegAttempts();
 
+  // Computed inline, no manual useMemo: renders here are driven by actual
+  // data changes (structural sharing keeps identities stable across polls),
+  // the engine is cheap at this field size, and the React Compiler couldn't
+  // preserve the manual memoization anyway.
   const ready = competitors.data && scores.data && kegAttempts.data;
-  const field = useMemo(
-    () => (competitors.data ? divisionField(activeDivisionId, competitors.data) : []),
-    [competitors.data, activeDivisionId]
-  );
-  const results = useMemo(() => {
-    if (!ready) return null;
-    return computeEventResults({
-      event,
-      division,
-      field,
-      scores: scores.data!,
-      kegAttempts: kegAttempts.data!,
-    });
-  }, [ready, event, division, field, scores.data, kegAttempts.data]);
+  const field = competitors.data ? divisionField(activeDivisionId, competitors.data) : [];
+  const results = ready
+    ? computeEventResults({
+        event,
+        division,
+        field,
+        scores: scores.data!,
+        kegAttempts: kegAttempts.data!,
+      })
+    : null;
 
   return (
     <div className="max-w-lg mx-auto px-4 py-8 animate-slide-up">
@@ -151,6 +151,17 @@ function RoundsScoring({
   );
   const progress = eligible.length > 0 ? Math.round((scored.length / eligible.length) * 100) : 0;
 
+  // Cut after the round being viewed (if this division cuts here)
+  const cutLine = results.cuts.find((c) => c.afterRound === round);
+  const cutProjectionReady =
+    cutLine !== undefined &&
+    cutLine.eligibleCount > 0 &&
+    cutLine.scoredCount / cutLine.eligibleCount >= 0.5 &&
+    cutLine.bubbleScore !== null;
+  const cutTies = cutLine !== undefined && cutLine.advancerIds.length > cutLine.target
+    ? ` (+${cutLine.advancerIds.length - cutLine.target} on ties)`
+    : "";
+
   return (
     <>
       {/* Round tabs */}
@@ -176,6 +187,24 @@ function RoundsScoring({
       </div>
 
       <p className="text-xs text-text-tertiary mb-2">{plan.rounds[round - 1].attemptLabel}</p>
+
+      {/* Cut line: locked → final; else a projection once half the round is in */}
+      {cutLine && (
+        <div
+          className={`mb-3 inline-flex items-center gap-1.5 text-[11px] font-medium px-2.5 py-1 rounded-full border ${
+            cutLine.locked
+              ? "border-emerald-500/40 bg-emerald-500/10 text-emerald-400"
+              : "border-amber-500/40 bg-amber-500/10 text-amber-400"
+          }`}
+        >
+          <Scissors size={12} className="shrink-0" />
+          {cutLine.locked
+            ? `Cut locked — ${cutLine.advancerIds.length} advance to Rd ${cutLine.afterRound + 1}`
+            : cutProjectionReady
+              ? `Cut after this round: top ${cutLine.target}${cutTies} · line at ${cutLine.bubbleScore!.toFixed(event.decimals)} ${event.unit}`
+              : `Cut after this round: top ${cutLine.target} — projection appears once half the round is in`}
+        </div>
+      )}
 
       {/* Progress */}
       <div className="mb-6 flex items-center gap-3">
@@ -360,7 +389,8 @@ function KegConsole({
     setHolds((h) => ({ ...h, [competitorId]: result }));
     setTimeout(() => {
       setHolds((h) => {
-        const { [competitorId]: _gone, ...rest } = h;
+        const rest = { ...h };
+        delete rest[competitorId];
         return rest;
       });
     }, 1400);
