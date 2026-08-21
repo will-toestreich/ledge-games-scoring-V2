@@ -17,6 +17,8 @@ export const fetchCompetitions = impl.fetchCompetitions;
 export const fetchActiveCompetition = impl.fetchActiveCompetition;
 export const createCompetition = impl.createCompetition;
 export const activateCompetition = impl.activateCompetition;
+export const reopenCompetition = impl.reopenCompetition;
+export const archiveCompetition = impl.archiveCompetition;
 export const renameCompetition = impl.renameCompetition;
 export const deleteCompetition = impl.deleteCompetition;
 

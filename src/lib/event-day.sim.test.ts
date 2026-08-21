@@ -617,4 +617,25 @@ describe("mock event day (full simulation through the real adapter)", () => {
     const comps = await db.fetchCompetitions();
     expect(comps.find((c) => c.id === "season-2025")!.competitorCount).toBeGreaterThan(0);
   });
+
+  it("phase 9 — season lifecycle: archive, reopen, one live season at a time", async () => {
+    const before = (await db.fetchCompetitions()).find((c) => c.isActive)!;
+
+    // Archive the live season in place — nothing is live afterwards
+    await db.archiveCompetition(before.id);
+    let comps = await db.fetchCompetitions();
+    expect(comps.every((c) => c.status === "completed")).toBe(true);
+
+    // Reopen the 2025 archive: it becomes the ONLY live season and the viewed one
+    await db.reopenCompetition("season-2025");
+    comps = await db.fetchCompetitions();
+    expect(comps.filter((c) => c.status === "active").map((c) => c.id)).toEqual(["season-2025"]);
+    expect(comps.find((c) => c.isActive)!.id).toBe("season-2025");
+
+    // Starting a new season: it is live and viewed; every other season is archived
+    await db.createCompetition({ name: "The Ledge Games", year: 2027 });
+    comps = await db.fetchCompetitions();
+    expect(comps.filter((c) => c.status === "active").map((c) => c.year)).toEqual([2027]);
+    expect(comps.find((c) => c.isActive)!.year).toBe(2027);
+  });
 });

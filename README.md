@@ -46,9 +46,10 @@ and **stall alarms**, plus arrow-off recording when a title ends tied.
 
 ## Data & seasons
 
-- **One competition (season) is active at a time**; past seasons stay
+- **One competition (season) is live at a time**; past seasons stay
   archived and browsable (Settings → Seasons). Starting a new season archives
-  the current one. The scoreboard marks archived seasons "Final".
+  all others; an archived season can be Reopened (making it the live season
+  again) or just Viewed. The scoreboard marks archived seasons "Final".
 - Data currently persists to **browser localStorage** behind an async
   adapter ([src/data/db.ts](src/data/db.ts)) accessed only through TanStack
   Query hooks — the planned Supabase swap touches one file.

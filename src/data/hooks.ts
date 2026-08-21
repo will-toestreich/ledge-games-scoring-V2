@@ -195,6 +195,22 @@ export function useRenameCompetition() {
   });
 }
 
+export function useReopenCompetition() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => db.reopenCompetition(id),
+    onSuccess: () => qc.invalidateQueries(),
+  });
+}
+
+export function useArchiveCompetition() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => db.archiveCompetition(id),
+    onSuccess: () => qc.invalidateQueries(),
+  });
+}
+
 export function useActivateCompetition() {
   const qc = useQueryClient();
   return useMutation({

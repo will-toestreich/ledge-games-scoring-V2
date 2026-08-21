@@ -186,11 +186,11 @@ export async function fetchActiveCompetition(): Promise<CompetitionMeta> {
   };
 }
 
-/** Start a new season: archives the current active competition. */
+/** Start a new season: it becomes THE live season; every other season is archived. */
 export async function createCompetition(opts: { name: string; year: number }): Promise<void> {
   const db = load();
   const prev = active();
-  prev.status = "completed";
+  for (const c of db.competitions) c.status = "completed";
   const rec: CompetitionRecord = {
     id: competitionId(opts.year, db.competitions),
     status: "active",
@@ -215,6 +215,29 @@ export async function renameCompetition(id: string, name: string): Promise<void>
   const comp = db.competitions.find((c) => c.id === id);
   if (!comp) throw new Error(`Unknown competition: ${id}`);
   comp.settings.competitionName = name;
+  persist();
+}
+
+/**
+ * Reopen an archived season: it becomes THE live season — any other live
+ * season is archived (one live season at a time) — and the viewed one.
+ */
+export async function reopenCompetition(id: string): Promise<void> {
+  const db = load();
+  const comp = db.competitions.find((c) => c.id === id);
+  if (!comp) throw new Error(`Unknown competition: ${id}`);
+  for (const c of db.competitions) if (c.status === "active") c.status = "completed";
+  comp.status = "active";
+  db.activeId = id;
+  persist();
+}
+
+/** Archive a live season in place (Start New Season also does this implicitly). */
+export async function archiveCompetition(id: string): Promise<void> {
+  const db = load();
+  const comp = db.competitions.find((c) => c.id === id);
+  if (!comp) throw new Error(`Unknown competition: ${id}`);
+  comp.status = "completed";
   persist();
 }
 

@@ -53,6 +53,8 @@ import {
   useActivateCompetition,
   useActiveCompetition,
   useActiveDivisions,
+  useArchiveCompetition,
+  useReopenCompetition,
   useCompetitions,
   useCompetitors,
   useCreateCompetition,
@@ -1483,6 +1485,8 @@ function SeasonsSection() {
   const { data: competitions, error } = useCompetitions();
   const create = useCreateCompetition();
   const activate = useActivateCompetition();
+  const reopen = useReopenCompetition();
+  const archive = useArchiveCompetition();
   const rename = useRenameCompetition();
   const remove = useDeleteCompetition();
   const [showNew, setShowNew] = useState(false);
@@ -1519,8 +1523,9 @@ function SeasonsSection() {
             Seasons
           </h3>
           <p className="text-sm text-text-secondary mt-0.5">
-            One competition runs at a time. Starting a new season archives the current one —
-            past seasons stay browsable by making them active.
+            One season is live at a time. Starting a new season archives all others.
+            View (browse an archive read-style), Reopen (make it the live season again),
+            or Archive (mark the live season finished).
           </p>
         </div>
         <button
@@ -1612,8 +1617,29 @@ function SeasonsSection() {
               <div className="text-[10px] text-text-tertiary mt-0.5">{c.competitorCount} competitors</div>
             </div>
             {!c.isActive && (
-              <button onClick={() => activate.mutate(c.id)} className="btn-secondary text-xs py-1.5 px-3">
-                Make Active
+              <button
+                onClick={() => activate.mutate(c.id)}
+                title="Browse this season on every screen without changing its live/archived status"
+                className="btn-secondary text-xs py-1.5 px-3"
+              >
+                View
+              </button>
+            )}
+            {c.status === "completed" ? (
+              <button
+                onClick={() => reopen.mutate(c.id)}
+                title="Make this the live season again — any other live season is archived"
+                className="text-xs py-1.5 px-3 rounded-lg border border-emerald-500/30 bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500/20 transition-colors"
+              >
+                Reopen
+              </button>
+            ) : (
+              <button
+                onClick={() => archive.mutate(c.id)}
+                title="Mark this season finished — the scoreboard shows it as Final (reversible with Reopen)"
+                className="btn-secondary text-xs py-1.5 px-3"
+              >
+                Archive
               </button>
             )}
             {/* An active season can't be deleted — neither the one being

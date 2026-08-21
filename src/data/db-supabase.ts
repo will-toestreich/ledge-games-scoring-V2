@@ -396,7 +396,8 @@ export async function createCompetition(opts: { name: string; year: number }): P
     .single();
   fail(error);
   const prevRow = prev as CompetitionRow;
-  fail((await sb().from("v2_competitions").update({ status: "completed" }).eq("id", activeId)).error);
+  // One live season at a time: archive EVERY other season, not just the viewed one
+  fail((await sb().from("v2_competitions").update({ status: "completed" }).eq("status", "active")).error);
   let id = `season-${opts.year}`;
   const { data: clash } = await sb().from("v2_competitions").select("id").like("id", `season-${opts.year}%`);
   const taken = new Set((clash ?? []).map((r) => r.id as string));
@@ -417,6 +418,24 @@ export async function createCompetition(opts: { name: string; year: number }): P
   );
   fail((await sb().from("v2_app_state").update({ active_competition_id: id }).eq("id", 1)).error);
   activeIdCache = null;
+  emitUpdated();
+}
+
+/**
+ * Reopen an archived season: it becomes THE live season — any other live
+ * season is archived (one live season at a time) — and the viewed one.
+ */
+export async function reopenCompetition(id: string): Promise<void> {
+  fail((await sb().from("v2_competitions").update({ status: "completed" }).eq("status", "active")).error);
+  fail((await sb().from("v2_competitions").update({ status: "active" }).eq("id", id)).error);
+  fail((await sb().from("v2_app_state").update({ active_competition_id: id }).eq("id", 1)).error);
+  activeIdCache = null;
+  emitUpdated();
+}
+
+/** Archive a live season in place (Start New Season also does this implicitly). */
+export async function archiveCompetition(id: string): Promise<void> {
+  fail((await sb().from("v2_competitions").update({ status: "completed" }).eq("id", id)).error);
   emitUpdated();
 }
 
