@@ -576,6 +576,10 @@ export const updateCompetitor = withOutbox(
     if (patch.checkedIn !== undefined) row.checked_in = patch.checkedIn;
     if (patch.noShow !== undefined) row.no_show = patch.noShow;
     if (patch.eventSkips !== undefined) row.event_skips = patch.eventSkips;
+    // Mutually exclusive flags: a day no-show is by definition not checked in,
+    // and checking someone in means they showed up after all
+    if (patch.noShow === true) row.checked_in = false;
+    else if (patch.checkedIn === true) row.no_show = false;
     fail((await sb().from("v2_competitors").update(row).eq("competition_id", compId).eq("id", id)).error);
   }
 );

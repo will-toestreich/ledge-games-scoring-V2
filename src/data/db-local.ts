@@ -325,7 +325,12 @@ export async function updateCompetitor(id: string, patch: Partial<Competitor>): 
   const comp = active();
   const i = comp.competitors.findIndex((c) => c.id === id);
   if (i < 0) throw new Error(`Unknown competitor: ${id}`);
-  comp.competitors[i] = { ...comp.competitors[i], ...patch, id: comp.competitors[i].id };
+  const next = { ...comp.competitors[i], ...patch, id: comp.competitors[i].id };
+  // Mutually exclusive flags: a day no-show is by definition not checked in,
+  // and checking someone in means they showed up after all
+  if (patch.noShow === true) next.checkedIn = false;
+  else if (patch.checkedIn === true) next.noShow = false;
+  comp.competitors[i] = next;
   persist();
 }
 

@@ -291,12 +291,22 @@ describe("mock event day (full simulation through the real adapter)", () => {
     // Walk-ons at the desk (form path: next free bib in the division block)
     await db.addCompetitors([makeCompetitor("mens", 75, 75), makeCompetitor("womens", 130, 30)]);
 
-    // Check-in sweep; two men never show → scratched at morning registration
+    // Check-in sweep; two men never show → scratched at morning registration.
+    // Marking no-show alone must clear check-in (mutually exclusive flags),
+    // and checking in must clear no-show ("they showed up after all").
     const all = await db.fetchCompetitors();
     for (const c of all) await db.updateCompetitor(c.id, { checkedIn: true });
     const mens = all.filter((c) => c.divisionId === "mens");
-    await db.updateCompetitor(mens[9].id, { noShow: true, checkedIn: false });
-    await db.updateCompetitor(mens[23].id, { noShow: true, checkedIn: false });
+    await db.updateCompetitor(mens[9].id, { noShow: true });
+    await db.updateCompetitor(mens[23].id, { noShow: true });
+    const flagCheck = (await db.fetchCompetitors()).find((c) => c.id === mens[9].id)!;
+    expect(flagCheck.noShow).toBe(true);
+    expect(flagCheck.checkedIn).toBe(false);
+    await db.updateCompetitor(mens[9].id, { checkedIn: true }); // turned up after all…
+    const back = (await db.fetchCompetitors()).find((c) => c.id === mens[9].id)!;
+    expect(back.noShow).toBe(false);
+    expect(back.checkedIn).toBe(true);
+    await db.updateCompetitor(mens[9].id, { noShow: true }); // …no, actually scratched
 
     // Pre-declared single-event skips
     await db.updateCompetitor(mens[4].id, { eventSkips: ["keg", "chop"] });
