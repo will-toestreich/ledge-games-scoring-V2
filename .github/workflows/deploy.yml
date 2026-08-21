@@ -27,7 +27,9 @@ jobs:
       - run: npm test
       - run: npm run build
         env:
-          VITE_BASE: /ledge-games-scoring-V2/
+          # Served at the domain root via the custom domain live.ledgegames.com
+          # (configured in repo Settings → Pages; the old github.io URL redirects)
+          VITE_BASE: /
           VITE_SUPABASE_URL: ${{ vars.VITE_SUPABASE_URL }}
           VITE_SUPABASE_ANON_KEY: ${{ vars.VITE_SUPABASE_ANON_KEY }}
       # SPA fallback: GitHub Pages serves 404.html for unknown paths, which
