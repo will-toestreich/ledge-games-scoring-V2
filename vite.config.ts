@@ -22,14 +22,14 @@ export default defineConfig({
         theme_color: "#08080c",
         background_color: "#08080c",
         display: "standalone",
+        // Square renders generated from brand/The-Ledge-Games-Icon-1.png
+        // (the source art is 1404×1540 — declaring it 512x512 square breaks
+        // install prompts). Maskable gets extra safe-zone padding. Relative
+        // paths so they resolve under the deploy base path.
         icons: [
-          {
-            // Relative so it resolves under the deploy base path
-            src: "brand/The-Ledge-Games-Icon-1.png",
-            sizes: "512x512",
-            type: "image/png",
-            purpose: "any maskable",
-          },
+          { src: "brand/icon-192.png", sizes: "192x192", type: "image/png", purpose: "any" },
+          { src: "brand/icon-512.png", sizes: "512x512", type: "image/png", purpose: "any" },
+          { src: "brand/icon-maskable-512.png", sizes: "512x512", type: "image/png", purpose: "maskable" },
         ],
       },
       workbox: {
