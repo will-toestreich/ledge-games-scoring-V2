@@ -154,7 +154,7 @@ function ViewTab({
 
 // ─── Auto-scroll hook ────────────────────────────────────
 
-function useAutoScroll(speed = 0.5, pauseMs = 3000) {
+function useAutoScroll(speed = 0.5, pauseMs = 3000, interactPauseMs = 8000) {
   const ref = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -162,9 +162,24 @@ function useAutoScroll(speed = 0.5, pauseMs = 3000) {
     let pauseUntil = Date.now() + pauseMs;
     let waitingToReset = false;
     let accumulated = 0;
+    let attached: HTMLElement | null = null;
+
+    // A human scrolling by hand (laptop trackpad, phone touch) wins: back off
+    // and resume from wherever they left it. The TV never fires these events.
+    const onInteract = () => {
+      pauseUntil = Date.now() + interactPauseMs;
+      accumulated = 0;
+    };
+    const interactEvents = ["wheel", "touchstart", "pointerdown"] as const;
 
     function tick() {
       const el = ref.current;
+      // The element mounts/swaps across layout changes — (re)attach listeners
+      if (el !== attached) {
+        if (attached) for (const e of interactEvents) attached.removeEventListener(e, onInteract);
+        if (el) for (const e of interactEvents) el.addEventListener(e, onInteract, { passive: true });
+        attached = el;
+      }
       if (!el) {
         raf = requestAnimationFrame(tick);
         return;
@@ -200,8 +215,11 @@ function useAutoScroll(speed = 0.5, pauseMs = 3000) {
     }
 
     raf = requestAnimationFrame(tick);
-    return () => cancelAnimationFrame(raf);
-  }, [speed, pauseMs]);
+    return () => {
+      cancelAnimationFrame(raf);
+      if (attached) for (const e of interactEvents) attached.removeEventListener(e, onInteract);
+    };
+  }, [speed, pauseMs, interactPauseMs]);
 
   return ref;
 }

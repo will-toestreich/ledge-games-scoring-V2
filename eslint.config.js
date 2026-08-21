@@ -20,4 +20,11 @@ export default defineConfig([
       globals: globals.browser,
     },
   },
+  {
+    // These files export non-components by design (the route tree object, the
+    // theme provider's useTheme hook). Splitting them for HMR granularity
+    // isn't worth the churn — the rule is off here, on everywhere else.
+    files: ['src/router.tsx', 'src/lib/theme.tsx'],
+    rules: { 'react-refresh/only-export-components': 'off' },
+  },
 ])
