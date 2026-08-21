@@ -144,7 +144,16 @@ function RoundsScoring({
   const division = divisions.find((d) => d.id === divisionId)!;
   const plan = event.divisions[divisionId]!;
   const nRounds = plan.rounds.length;
-  const [rawRound, setRound] = useState(() => Math.min(Math.max(results.currentRound, 1), nRounds));
+  const [rawRound, setRound] = useState(() => {
+    // Default to the round the field is actually working: the first round
+    // whose eligible list isn't fully scored. Once a round completes and its
+    // cut locks, scorers land on the NEXT round automatically.
+    for (let r = 1; r <= nRounds; r++) {
+      const eligible = results.eligibleByRound[r - 1] ?? [];
+      if (eligible.some((id) => !results.byCompetitor.get(id)!.roundComplete[r - 1])) return r;
+    }
+    return nRounds; // event complete — show the finals
+  });
   // Belt-and-braces: never index past this division's plan even if state leaks
   const round = Math.min(rawRound, nRounds);
 

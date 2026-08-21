@@ -1753,6 +1753,8 @@ function MissionControlTab() {
           event: events.find((e) => e.id === eventId)!,
           r,
           hasCuts: res.hasCuts,
+          // The completed round's locked cut — "what did it take to make it?"
+          cut: res.cuts.find((c) => c.afterRound === r.completedRound),
           advancers: r.advancerIds.map((id) => byId.get(id)!).filter(Boolean),
         };
       })
@@ -1925,7 +1927,7 @@ function MissionControlTab() {
             Ready to Move On
           </h3>
           <div className="space-y-2">
-            {readiness.map(({ division: d, event, r, hasCuts, advancers }) => (
+            {readiness.map(({ division: d, event, r, hasCuts, cut, advancers }) => (
               <div
                 key={`${event.id}-${d.id}`}
                 className={`flex items-center gap-3 rounded-xl border px-4 py-3 ${
@@ -1942,6 +1944,17 @@ function MissionControlTab() {
                       <>ready for Rd {r.nextRound} ({roundLabel(d, r.nextRound)})</>
                     )}
                   </span>
+                  {/* The locked cut line: what it took to make it */}
+                  {cut && cut.bubbleScore !== null && (
+                    <span
+                      className="ml-2 inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full border border-emerald-500/30 bg-emerald-500/10 text-emerald-400 align-middle"
+                      title={`Top ${cut.target}${cut.advancerIds.length > cut.target ? ` (+${cut.advancerIds.length - cut.target} on ties)` : ""} advanced — the last spot inside the line ${event.direction === "asc" ? "needed" : "took"} ${cut.bubbleScore.toFixed(event.decimals)} ${event.unit}`}
+                    >
+                      <Scissors size={10} className="shrink-0" />
+                      cut at {cut.bubbleScore.toFixed(event.decimals)} {event.unit}
+                      {cut.advancerIds.length > cut.target && ` · +${cut.advancerIds.length - cut.target} ties`}
+                    </span>
+                  )}
                   {/* Advancer chips only make sense where a cut happened —
                       no-cut divisions carry the whole field forward */}
                   {hasCuts && (
@@ -2160,10 +2173,11 @@ function EventStatusCard({
     const p = eventProgress(res);
     const owed = pendingScorers(res);
     const byId = new Map(data.field.map((c) => [c.id, c]));
-    // Live cut projection: the first unlocked cut, once half its round is in.
-    // It moves with every score until the round completes and it locks
+    // Live cut projection: the first unlocked cut. Below half-scored it shows
+    // as "forming" (a line through mostly-unscored data is noise); from half
+    // on it's the moving line, until the round completes and it locks
     // (locked cuts get announced in "Ready to Move On").
-    const proj = live ? res.cuts.find((c) => !c.locked) : undefined;
+    const proj = live && res.started ? res.cuts.find((c) => !c.locked) : undefined;
     const projReady =
       proj !== undefined &&
       proj.eligibleCount > 0 &&
@@ -2175,7 +2189,8 @@ function EventStatusCard({
       pct: p.pct,
       label: p.detail ? `${p.label} · ${p.detail}` : p.label,
       complete: p.complete,
-      cut: projReady ? proj : undefined,
+      cut: proj,
+      cutReady: projReady,
       owedLabel: owed?.label,
       owed: owed ? owed.competitorIds.map((id) => byId.get(id)!).filter(Boolean) : [],
     };
@@ -2222,7 +2237,7 @@ function EventStatusCard({
       </div>
 
       <div className="flex gap-2">
-        {details.map(({ division: d, pct, label, cut }) => {
+        {details.map(({ division: d, pct, label, cut, cutReady }) => {
           const ties = cut && cut.advancerIds.length > cut.target ? `+${cut.advancerIds.length - cut.target}` : "";
           return (
             <div key={d.id} className="flex-1 text-center">
@@ -2232,7 +2247,7 @@ function EventStatusCard({
               </div>
               <div className="text-[10px] text-text-tertiary mt-0.5 font-mono">{pct}%</div>
               <div className="text-[9px] text-text-tertiary mt-0.5">{label}</div>
-              {cut && (
+              {cut && cutReady && (
                 <div
                   className="text-[9px] text-amber-400 mt-0.5 inline-flex items-center gap-0.5 font-mono"
                   title={`Projected cut after Rd ${cut.afterRound}: top ${cut.target}${ties && ` (${ties} on ties)`} advance · line at ${cut.bubbleScore!.toFixed(event.decimals)} ${event.unit} · ${cut.scoredCount}/${cut.eligibleCount} scored — keeps moving until the round is fully scored`}
@@ -2240,6 +2255,15 @@ function EventStatusCard({
                   <Scissors size={9} className="shrink-0" />
                   top {cut.target}
                   {ties} · {cut.bubbleScore!.toFixed(event.decimals)} {event.unit}
+                </div>
+              )}
+              {cut && !cutReady && (
+                <div
+                  className="text-[9px] text-text-tertiary mt-0.5 inline-flex items-center gap-0.5 font-mono"
+                  title={`This round cuts to top ${cut.target}. The projected line appears once half the round is scored (${cut.scoredCount}/${cut.eligibleCount} in so far).`}
+                >
+                  <Scissors size={9} className="shrink-0" />
+                  top {cut.target} · forming
                 </div>
               )}
             </div>
