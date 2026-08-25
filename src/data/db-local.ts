@@ -325,6 +325,14 @@ export async function updateCompetitor(id: string, patch: Partial<Competitor>): 
   const comp = active();
   const i = comp.competitors.findIndex((c) => c.id === id);
   if (i < 0) throw new Error(`Unknown competitor: ${id}`);
+  // Bib uniqueness on edit too (the cloud schema enforces this with a
+  // database constraint; local parity so both adapters behave the same)
+  if (
+    patch.bibNumber !== undefined &&
+    comp.competitors.some((c) => c.bibNumber === patch.bibNumber && c.id !== id)
+  ) {
+    throw new Error(`Bib ${patch.bibNumber} is already taken`);
+  }
   const next = { ...comp.competitors[i], ...patch, id: comp.competitors[i].id };
   // Mutually exclusive flags: a day no-show is by definition not checked in,
   // and checking someone in means they showed up after all

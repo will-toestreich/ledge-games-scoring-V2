@@ -969,6 +969,11 @@ function RoundEditor({
   // Partial rounds are legal (set 1 recorded before set 2 is thrown)
   const complete = filled.length > 0 && !parsed.some(Number.isNaN);
   const overMax = plan.maxPerAttempt !== undefined && parsed.some((v) => v > plan.maxPerAttempt!);
+  // The number inputs don't stop typed garbage: a negative chop time would
+  // rank FIRST, a negative penalty is a time bonus, 1e999 is Infinity
+  const outOfDomain =
+    parsed.some((v) => v < 0 || !Number.isFinite(v)) ||
+    penalties.some((p) => p < 0 || !Number.isFinite(p));
   // Restricted-value events (caber clock scoring) must hold in the
   // correction path too, not just the scorer's clock-face UI
   const invalidValue =
@@ -1021,6 +1026,7 @@ function RoundEditor({
           </label>
         ))}
       {overMax && <span className="text-xs text-red-400 self-center">max {plan.maxPerAttempt} {event.unit}</span>}
+      {outOfDomain && <span className="text-xs text-red-400 self-center">values must be 0 or more</span>}
       {invalidValue && (
         <span className="text-xs text-red-400 self-center">
           allowed: {event.allowedValues!.join(" / ")}
@@ -1039,7 +1045,7 @@ function RoundEditor({
           <X size={12} /> Cancel
         </button>
         <button
-          disabled={!complete || overMax || invalidValue}
+          disabled={!complete || overMax || invalidValue || outOfDomain}
           onClick={() =>
             save.mutate(
               {
@@ -1155,6 +1161,7 @@ function SettingsSection({
 
 function SettingsTab() {
   const { data: settings } = useSettings();
+  const { data: activeComp } = useActiveCompetition();
   const saveSettings = useSaveSettings();
   const resetDemo = useResetDemoData();
   const resetScores = useResetActiveSeasonScores();
@@ -1418,6 +1425,12 @@ function SettingsTab() {
                   arrow-off. The roster ({competitors?.length ?? 0} competitors) is untouched.
                   A backup of everything downloads first.
                 </p>
+                {activeComp?.status !== "active" && (
+                  <p className="text-xs font-bold text-red-400 mb-2.5">
+                    ⚠ You are viewing an ARCHIVED season — these are historical results. Resetting a
+                    past season's scores erases the record of that competition.
+                  </p>
+                )}
                 <div className="flex gap-2">
                   <button
                     onClick={async () => {
