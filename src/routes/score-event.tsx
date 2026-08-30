@@ -226,9 +226,11 @@ function RoundsScoring({
         >
           <Scissors size={12} className="shrink-0" />
           {cutLine.locked
-            ? `Cut locked — ${cutLine.advancerIds.length} advance to Rd ${cutLine.afterRound + 1}`
+            ? cutLine.bubbleScore !== null
+              ? `top ${cutLine.target}${cutTies} · Cut @ ${cutLine.bubbleScore.toFixed(event.decimals)} ${event.unit} — ${cutLine.advancerIds.length} advance to Rd ${cutLine.afterRound + 1}`
+              : `Cut locked — ${cutLine.advancerIds.length} advance to Rd ${cutLine.afterRound + 1}`
             : cutProjectionReady
-              ? `Cut after this round: top ${cutLine.target}${cutTies} · line at ${cutLine.bubbleScore!.toFixed(event.decimals)} ${event.unit}`
+              ? `top ${cutLine.target}${cutTies} · Projected Cut @ ${cutLine.bubbleScore!.toFixed(event.decimals)} ${event.unit}`
               : `Cut after this round: top ${cutLine.target} — projection appears once half the round is in`}
         </div>
       )}
