@@ -128,6 +128,25 @@ describe("csv import (ordering-system export)", () => {
     ]);
   });
 
+  it("payment collection status follows registration type", () => {
+    const g = gridFromMatrix([
+      ["Bib", "Name", "Division", "Registration"],
+      ["1", "Online Payer", "Men's Division", "PAID"],
+      ["2", "Card Payer", "Men's Division", "Credit Card"],
+      ["3", "Cash At Desk", "Men's Division", "At Event (Cash)"],
+      ["4", "Comped", "Men's Division", "Sponsor"],
+      ["5", "No Info", "Men's Division", ""],
+    ]);
+    const rows = buildCompetitors(g.rows, detectMapping(g.headers), []);
+    expect(rows.map((r) => [r.competitor!.registration, r.competitor!.paid])).toEqual([
+      ["paid", true],
+      ["paid", true],
+      ["cash", false],
+      ["sponsor", true],
+      ["cash", false],
+    ]);
+  });
+
   it("blank division infers from the bib block, flagged", () => {
     const g = gridFromMatrix([
       ["Bib", "Name", "Division"],

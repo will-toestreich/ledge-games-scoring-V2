@@ -201,6 +201,10 @@ export function buildCompetitors(
     if (!divisionId) errors.push(divRaw ? `unknown division "${divRaw}"` : "missing division");
 
     if (errors.length === 0) takenBibs.add(bib);
+    // Money owed at the desk only for cash-at-event (and unknown) rows:
+    // online payments AND sponsor comps import as already settled
+    const registration = parseRegistration(col(raw, "registration"));
+    const paid = registration === "paid" || registration === "sponsor";
     return {
       line: i + 2, // header is line 1
       errors,
@@ -219,10 +223,8 @@ export function buildCompetitors(
               hometown: col(raw, "hometown") || null,
               email: col(raw, "email") || null,
               shirtSize: parseShirt(col(raw, "shirtSize")),
-              // No registration info → assume cash at the event, not yet
-              // collected; only explicitly-paid rows import as paid
-              registration: parseRegistration(col(raw, "registration")) ?? "cash",
-              paid: parseRegistration(col(raw, "registration")) === "paid",
+              registration: registration ?? "cash",
+              paid,
               checkedIn: false,
               noShow: false,
               eventSkips: [],
