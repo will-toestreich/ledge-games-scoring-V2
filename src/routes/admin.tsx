@@ -63,6 +63,7 @@ import {
   useDivisionScoring,
   useKegAttempts,
   useRenameCompetition,
+  useResetActiveSeasonCompetitors,
   useResetActiveSeasonScores,
   useResetDemoData,
   useSaveRoundAttempts,
@@ -73,6 +74,8 @@ import {
   useUpdateCompetitor,
 } from "@/data/hooks";
 import * as db from "@/data/db";
+import { resultsCsv, rosterCsv } from "@/lib/exports";
+import { checkDataHealth, type HealthReport } from "@/lib/health";
 import { useQueryClient } from "@tanstack/react-query";
 
 type Tab = "mission-control" | "competitors" | "scores" | "settings";
@@ -1165,6 +1168,7 @@ function SettingsTab() {
   const saveSettings = useSaveSettings();
   const resetDemo = useResetDemoData();
   const resetScores = useResetActiveSeasonScores();
+  const resetRoster = useResetActiveSeasonCompetitors();
   const qc = useQueryClient();
   const [pin, setPin] = useState<string | null>(null);
   const { data: competitors } = useCompetitors();
@@ -1172,6 +1176,9 @@ function SettingsTab() {
   const { data: kegAttempts } = useKegAttempts();
   const [confirmData, setConfirmData] = useState<"demo" | "2025" | null>(null);
   const [confirmScoreReset, setConfirmScoreReset] = useState(false);
+  const [confirmRosterReset, setConfirmRosterReset] = useState(false);
+  const [devToolsOpen, setDevToolsOpen] = useState(false);
+  const [health, setHealth] = useState<HealthReport | null>(null);
   const restoreInputRef = useRef<HTMLInputElement>(null);
   const [restoreFile, setRestoreFile] = useState<{ name: string; raw: string; seasons: string[] } | null>(null);
   const [restoreError, setRestoreError] = useState<string | null>(null);
@@ -1186,17 +1193,37 @@ function SettingsTab() {
     run();
   }
 
-  async function downloadBackup(label = "backup") {
-    const json = await db.exportBackup();
-    const blob = new Blob([json], { type: "application/json" });
+  function downloadText(filename: string, text: string, mime: string) {
+    const blob = new Blob([text], { type: mime });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
-    const d = new Date();
-    const stamp = `${d.toISOString().slice(0, 10)}-${String(d.getHours()).padStart(2, "0")}${String(d.getMinutes()).padStart(2, "0")}`;
     a.href = url;
-    a.download = `ledge-games-${label}-${stamp}.json`;
+    a.download = filename;
     a.click();
     URL.revokeObjectURL(url);
+  }
+
+  function stamp(): string {
+    const d = new Date();
+    return `${d.toISOString().slice(0, 10)}-${String(d.getHours()).padStart(2, "0")}${String(d.getMinutes()).padStart(2, "0")}`;
+  }
+
+  async function downloadBackup(label = "backup") {
+    downloadText(`ledge-games-${label}-${stamp()}.json`, await db.exportBackup(), "application/json");
+  }
+
+  function exportResults() {
+    if (!competitors || !scores || !kegAttempts || !settings) return;
+    downloadText(
+      `ledge-games-results-${settings.year}-${stamp()}.csv`,
+      resultsCsv({ competitors, scores, kegAttempts, settings }),
+      "text/csv"
+    );
+  }
+
+  function exportRoster() {
+    if (!competitors) return;
+    downloadText(`ledge-games-roster-${settings?.year ?? ""}-${stamp()}.csv`, rosterCsv(competitors), "text/csv");
   }
 
   async function pickRestoreFile(file: File) {
@@ -1397,6 +1424,25 @@ function SettingsTab() {
               </div>
             )}
           </div>
+          {/* CSV exports: the awards-ceremony results sheet + the desk roster */}
+          <div className="flex items-center justify-between gap-4 pb-3 border-b border-border-subtle">
+            <div>
+              <div className="font-medium text-sm text-text-primary">Export CSVs</div>
+              <p className="text-xs text-text-secondary">
+                Results: standings with per-event points, all divisions — the awards sheet.
+                Roster: everyone with check-in, payment, and merch columns — for the desk.
+              </p>
+            </div>
+            <div className="flex gap-2 shrink-0">
+              <button onClick={exportResults} className="btn-secondary text-xs py-1.5 px-3 inline-flex items-center gap-1.5">
+                <Trophy size={13} /> Results
+              </button>
+              <button onClick={exportRoster} className="btn-secondary text-xs py-1.5 px-3 inline-flex items-center gap-1.5">
+                <Users size={13} /> Roster
+              </button>
+            </div>
+          </div>
+
           {/* Reset scores — the "clear the test scoring, run the real day" tool.
               Double opt-in: arm the button, then confirm against live counts;
               a backup auto-downloads before anything is deleted. */}
@@ -1449,42 +1495,127 @@ function SettingsTab() {
               </div>
             )}
           </div>
-          <p className="text-xs text-amber-400/90">
-            Both tools OVERWRITE the currently active season's data in place. To browse last
-            year, use Seasons → Make Active instead.
-          </p>
-          <div className="flex items-center justify-between gap-4">
-            <div>
-              <div className="font-medium text-sm text-text-primary">Reload 2025 season</div>
-              <p className="text-xs text-text-secondary">Real roster + full scoring from last year's sheets. Overwrites the active season.</p>
+          {/* Reset competitor list — the "bad import, start over" tool */}
+          <div className="pb-3 border-b border-border-subtle">
+            <div className="flex items-center justify-between gap-4">
+              <div>
+                <div className="font-medium text-sm text-text-primary">Reset competitor list</div>
+                <p className="text-xs text-text-secondary">
+                  Deletes every competitor in the active season — and with them all recorded
+                  scores. Settings and PIN are kept. Use after a bad import.
+                </p>
+              </div>
+              <button
+                onClick={() => setConfirmRosterReset(true)}
+                disabled={confirmRosterReset}
+                className="btn-secondary text-xs py-1.5 px-3 inline-flex items-center gap-1.5 shrink-0"
+              >
+                <Eraser size={13} /> Reset competitors…
+              </button>
             </div>
-            <button
-              onClick={() =>
-                dataAction("2025", async () => {
-                  await db.loadSeason2025();
-                  qc.invalidateQueries();
-                })
-              }
-              className={`text-xs py-1.5 px-3 rounded-lg inline-flex items-center gap-1.5 shrink-0 transition-all ${
-                confirmData === "2025" ? "bg-red-500 text-white" : "btn-secondary"
-              }`}
-            >
-              <Upload size={13} /> {confirmData === "2025" ? "Really overwrite active season?" : "Load 2025"}
-            </button>
+            {confirmRosterReset && (
+              <div className="mt-3 rounded-lg border border-red-500/30 bg-red-500/10 p-3">
+                <p className="text-xs text-red-400 font-medium mb-2.5">
+                  This permanently deletes all {competitors?.length ?? 0} competitors from
+                  “{settings.competitionName} {settings.year}”, plus their {scores?.length ?? 0} scores
+                  and {kegAttempts?.length ?? 0} keg attempts. A backup of everything downloads first.
+                </p>
+                {activeComp?.status !== "active" && (
+                  <p className="text-xs font-bold text-red-400 mb-2.5">
+                    ⚠ You are viewing an ARCHIVED season — these are historical results. Resetting a
+                    past season erases the record of that competition.
+                  </p>
+                )}
+                <div className="flex gap-2">
+                  <button
+                    onClick={async () => {
+                      await downloadBackup("pre-roster-reset");
+                      resetRoster.mutate(undefined, { onSuccess: () => setConfirmRosterReset(false) });
+                    }}
+                    disabled={resetRoster.isPending}
+                    className="text-xs font-medium px-3 py-1.5 rounded-lg bg-red-500 text-white"
+                  >
+                    {resetRoster.isPending ? "Deleting…" : "Yes — delete the competitor list"}
+                  </button>
+                  <button onClick={() => setConfirmRosterReset(false)} className="btn-secondary text-xs py-1.5 px-3">
+                    Cancel
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
-          <div className="flex items-center justify-between gap-4">
-            <div>
-              <div className="font-medium text-sm text-text-primary">Reset to demo data</div>
-              <p className="text-xs text-text-secondary">Synthetic mid-competition dataset for testing. Overwrites the active season.</p>
+
+          {/* Data health check: surfaces junk that hand-edits can leave behind */}
+          <div className="pb-3 border-b border-border-subtle">
+            <div className="flex items-center justify-between gap-4">
+              <div>
+                <div className="font-medium text-sm text-text-primary">Data health check</div>
+                <p className="text-xs text-text-secondary">
+                  Scans the active season for orphaned scores, duplicate bibs, out-of-plan
+                  rounds, impossible values, and contradictory flags.
+                </p>
+              </div>
+              <button
+                onClick={() =>
+                  competitors && scores && kegAttempts && setHealth(checkDataHealth(competitors, scores, kegAttempts))
+                }
+                className="btn-secondary text-xs py-1.5 px-3 inline-flex items-center gap-1.5 shrink-0"
+              >
+                <CheckCircle2 size={13} /> Check data
+              </button>
             </div>
+            {health && (
+              <div
+                className={`mt-3 rounded-lg border p-3 text-xs ${
+                  health.findings.length === 0
+                    ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-400"
+                    : "border-amber-500/30 bg-amber-500/10 text-amber-400"
+                }`}
+              >
+                {health.findings.length === 0 ? (
+                  <>
+                    No issues found — checked {health.checked.competitors} competitors,{" "}
+                    {health.checked.scores} scores, {health.checked.kegAttempts} keg attempts.
+                  </>
+                ) : (
+                  <ul className="space-y-1">
+                    {health.findings.map((f, i) => (
+                      <li key={i}>• {f}</li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+            )}
+          </div>
+
+          {/* Dev-only tooling, collapsed so nobody fat-fingers it on event day */}
+          <div>
             <button
-              onClick={() => dataAction("demo", () => resetDemo.mutate())}
-              className={`text-xs py-1.5 px-3 rounded-lg inline-flex items-center gap-1.5 shrink-0 transition-all ${
-                confirmData === "demo" ? "bg-red-500 text-white" : "btn-secondary"
-              }`}
+              onClick={() => setDevToolsOpen(!devToolsOpen)}
+              className="inline-flex items-center gap-1.5 text-xs text-text-tertiary hover:text-text-secondary transition-colors"
             >
-              <RotateCcw size={13} /> {confirmData === "demo" ? "Really overwrite active season?" : "Reset demo"}
+              <ChevronDown size={12} className={`transition-transform ${devToolsOpen ? "rotate-180" : ""}`} />
+              Developer tools
             </button>
+            {devToolsOpen && (
+              <div className="mt-3 flex items-center justify-between gap-4">
+                <div>
+                  <div className="font-medium text-sm text-text-primary">Reset to demo data</div>
+                  <p className="text-xs text-text-secondary">
+                    Synthetic mid-competition dataset for testing. OVERWRITES the active season's
+                    roster and scores in place.
+                  </p>
+                </div>
+                <button
+                  onClick={() => dataAction("demo", () => resetDemo.mutate())}
+                  className={`text-xs py-1.5 px-3 rounded-lg inline-flex items-center gap-1.5 shrink-0 transition-all ${
+                    confirmData === "demo" ? "bg-red-500 text-white" : "btn-secondary"
+                  }`}
+                >
+                  <RotateCcw size={13} /> {confirmData === "demo" ? "Really overwrite active season?" : "Reset demo"}
+                </button>
+              </div>
+            )}
           </div>
         </div>
       </SettingsSection>

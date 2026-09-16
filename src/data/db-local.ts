@@ -443,6 +443,20 @@ export async function resetActiveSeasonScores(): Promise<void> {
   persist();
 }
 
+/**
+ * Delete the ACTIVE season's entire competitor list — and with it every
+ * score and keg attempt (scores without competitors are orphans). Settings
+ * and PIN are kept. The "bad import, start over" tool.
+ */
+export async function resetActiveSeasonCompetitors(): Promise<void> {
+  const comp = active();
+  comp.competitors = [];
+  comp.scores = [];
+  comp.kegAttempts = [];
+  delete comp.settings.titleTiebreakWinners;
+  persist();
+}
+
 /** Replace the active competition's data with the synthetic demo dataset. */
 export async function resetDemoData(): Promise<void> {
   const comp = active();

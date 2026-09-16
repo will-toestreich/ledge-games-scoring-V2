@@ -626,6 +626,13 @@ describe("mock event day (full simulation through the real adapter)", () => {
     // The archived 2025 season is untouched — only the ACTIVE season resets
     const comps = await db.fetchCompetitions();
     expect(comps.find((c) => c.id === "season-2025")!.competitorCount).toBeGreaterThan(0);
+
+    // Roster reset: competitors AND their data go; settings and PIN stay
+    await db.resetActiveSeasonCompetitors();
+    expect(await db.fetchCompetitors()).toEqual([]);
+    expect(await db.fetchScores()).toEqual([]);
+    expect((await db.fetchSettings()).scorerPin).toBe("4242");
+    expect((await db.fetchCompetitions()).find((c) => c.id === "season-2025")!.competitorCount).toBeGreaterThan(0);
   });
 
   it("phase 9 — season lifecycle: archive, reopen, one live season at a time", async () => {

@@ -39,6 +39,7 @@ export const saveSettings = impl.saveSettings;
 
 export const pingDatabase = impl.pingDatabase;
 export const resetActiveSeasonScores = impl.resetActiveSeasonScores;
+export const resetActiveSeasonCompetitors = impl.resetActiveSeasonCompetitors;
 export const resetDemoData = impl.resetDemoData;
 export const loadSeason2025 = impl.loadSeason2025;
 export const exportBackup = impl.exportBackup;

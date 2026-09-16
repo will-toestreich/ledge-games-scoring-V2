@@ -632,6 +632,19 @@ export async function resetActiveSeasonScores(): Promise<void> {
   emitUpdated();
 }
 
+/**
+ * Delete the ACTIVE season's entire competitor list — and with it every
+ * score and keg attempt. Settings and PIN are kept.
+ */
+export async function resetActiveSeasonCompetitors(): Promise<void> {
+  const id = await getActiveId();
+  fail((await sb().from("v2_scores").delete().eq("competition_id", id)).error);
+  fail((await sb().from("v2_keg_attempts").delete().eq("competition_id", id)).error);
+  fail((await sb().from("v2_competitors").delete().eq("competition_id", id)).error);
+  fail((await sb().from("v2_competitions").update({ title_tiebreak_winners: {} }).eq("id", id)).error);
+  emitUpdated();
+}
+
 async function replaceActiveData(data: SeasonData, keepPin: boolean): Promise<void> {
   const id = await getActiveId();
   fail((await sb().from("v2_scores").delete().eq("competition_id", id)).error);

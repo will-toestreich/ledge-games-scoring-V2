@@ -171,6 +171,14 @@ export function useResetActiveSeasonScores() {
   });
 }
 
+export function useResetActiveSeasonCompetitors() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: () => db.resetActiveSeasonCompetitors(),
+    onSuccess: () => qc.invalidateQueries(),
+  });
+}
+
 export function useResetDemoData() {
   const qc = useQueryClient();
   return useMutation({
