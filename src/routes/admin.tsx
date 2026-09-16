@@ -365,8 +365,22 @@ function CompetitorsTab() {
     competitors.length > 0 ? Math.round((n / competitors.length) * 100) : 0;
 
   function downloadTemplate() {
-    const headers = ["Bib", "First Name", "Last Name", "Email", "Division (mens/womens/mentors)", "Nickname", "Hometown", "Shirt Size"];
-    const blob = new Blob([headers.join(",") + "\n"], { type: "text/csv" });
+    // Every mappable field, plus one example row so the formats are obvious.
+    // All headers auto-detect in the import's mapping step.
+    const headers = [
+      "Bib",
+      "First Name",
+      "Last Name",
+      "Division (mens/womens/mentors)",
+      "Nickname",
+      "Hometown",
+      "Email",
+      "Shirt Size",
+      "Registration (paid/cash/sponsor)",
+      "Paid (yes/no)",
+    ];
+    const example = ["1", "Paul", "Bunyan", "mens", "The Axe", '"Brainerd, MN"', "paul@example.com", "XL", "cash", "no"];
+    const blob = new Blob([headers.join(",") + "\n" + example.join(",") + "\n"], { type: "text/csv" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;

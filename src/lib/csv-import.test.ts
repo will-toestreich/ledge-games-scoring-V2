@@ -147,6 +147,30 @@ describe("csv import (ordering-system export)", () => {
     ]);
   });
 
+  it("the downloadable template auto-detects completely, Paid ≠ Registration", () => {
+    const g = gridFromMatrix([
+      [
+        "Bib", "First Name", "Last Name", "Division (mens/womens/mentors)", "Nickname",
+        "Hometown", "Email", "Shirt Size", "Registration (paid/cash/sponsor)", "Paid (yes/no)",
+      ],
+      ["1", "Paul", "Bunyan", "mens", "The Axe", "Brainerd, MN", "paul@example.com", "XL", "cash", "no"],
+      ["2", "Babe", "Blue", "womens", "", "", "", "M", "cash", "yes"], // paid override: cash but collected
+      ["3", "Card", "Payer", "mens", "", "", "", "", "credit card", ""], // blank Paid → derived true
+    ]);
+    const m = detectMapping(g.headers);
+    expect(m.registration).toBe("Registration (paid/cash/sponsor)");
+    expect(m.paid).toBe("Paid (yes/no)"); // must NOT be swallowed by registration
+    expect(m.firstName).toBe("First Name");
+    expect(m.division).toBe("Division (mens/womens/mentors)");
+    expect(m.shirtSize).toBe("Shirt Size");
+    const rows = buildCompetitors(g.rows, m, []);
+    expect(rows.map((r) => [r.competitor!.registration, r.competitor!.paid])).toEqual([
+      ["cash", false],
+      ["cash", true],
+      ["paid", true],
+    ]);
+  });
+
   it("blank division infers from the bib block, flagged", () => {
     const g = gridFromMatrix([
       ["Bib", "Name", "Division"],

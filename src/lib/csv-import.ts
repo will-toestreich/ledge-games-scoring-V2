@@ -70,6 +70,7 @@ export const MAPPING_FIELDS = [
   { key: "email", label: "Email", required: false },
   { key: "shirtSize", label: "Shirt size", required: false },
   { key: "registration", label: "Registration", required: false },
+  { key: "paid", label: "Paid (yes/no)", required: false },
 ] as const;
 
 export type MappingField = (typeof MAPPING_FIELDS)[number]["key"];
@@ -86,7 +87,9 @@ const HEADER_ALIASES: Record<MappingField, string[]> = {
   hometown: ["hometown", "city", "town"],
   email: ["email", "emailaddress"],
   shirtSize: ["shirtsize", "shirt", "shirthat", "size", "tshirt", "tshirtsize"],
-  registration: ["registration", "reg", "payment", "paymentstatus", "paid"],
+  // NOT "paid" — a column named Paid is the collected-flag, below
+  registration: ["registration", "reg", "registrationpaidcashsponsor", "payment", "paymentstatus"],
+  paid: ["paid", "paidyesno", "collected", "paymentcollected"],
 };
 
 /** Best-guess mapping from the CSV's headers; every guess is overridable. */
@@ -135,6 +138,14 @@ export function parseShirt(raw: string): string | null {
   };
   v = words[v] ?? v.toUpperCase();
   return SHIRT_SIZES.includes(v) ? v : null;
+}
+
+/** Collected flag: yes/y/true/x/1/paid → true; no/n/false/0 → false; else null. */
+export function parsePaid(raw: string): boolean | null {
+  const v = norm(raw);
+  if (["yes", "y", "true", "x", "1", "paid"].includes(v)) return true;
+  if (["no", "n", "false", "0", "unpaid"].includes(v)) return false;
+  return null;
 }
 
 /**
@@ -202,9 +213,10 @@ export function buildCompetitors(
 
     if (errors.length === 0) takenBibs.add(bib);
     // Money owed at the desk only for cash-at-event (and unknown) rows:
-    // online payments AND sponsor comps import as already settled
+    // online payments AND sponsor comps import as already settled. A mapped
+    // Paid column overrides that default where its cell is decisive.
     const registration = parseRegistration(col(raw, "registration"));
-    const paid = registration === "paid" || registration === "sponsor";
+    const paid = parsePaid(col(raw, "paid")) ?? (registration === "paid" || registration === "sponsor");
     return {
       line: i + 2, // header is line 1
       errors,
