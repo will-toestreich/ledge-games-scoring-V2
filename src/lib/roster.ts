@@ -2,7 +2,8 @@
 
 import type { Competitor, DivisionId } from "./types";
 
-export const SHIRT_SIZES = ["S", "M", "L", "XL", "2XL", "3XL"];
+/** Merch options: shirt sizes plus the hat alternative the order form offers. */
+export const SHIRT_SIZES = ["S", "M", "L", "XL", "2XL", "3XL", "Hat"];
 
 /** Bib blocks per the rules: Men's from #1, Women's from #101, Mentors from #151. */
 export const BIB_START: Record<DivisionId, number> = { mens: 1, womens: 101, mentors: 151 };

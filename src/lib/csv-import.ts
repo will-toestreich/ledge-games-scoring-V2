@@ -123,10 +123,12 @@ export function parseDivision(raw: string): DivisionId | null {
 
 /**
  * "Shirt - Medium" → M, "Shirt - XXXL" → 3XL, "XL" → XL;
- * non-shirt merch ("Knit Stocking Cap") → null.
+ * "Knit Stocking Cap" (and any hat/beanie value) → Hat.
  */
 export function parseShirt(raw: string): string | null {
-  let v = norm(raw).replace(/^shirt/, "");
+  const n = norm(raw);
+  if (n.includes("hat") || n.includes("cap") || n.includes("beanie")) return "Hat";
+  let v = n.replace(/^shirt/, "");
   const words: Record<string, string> = {
     small: "S", medium: "M", med: "M", large: "L",
     xlarge: "XL", xxlarge: "2XL", xxl: "2XL", xxxl: "3XL",

@@ -74,8 +74,10 @@ describe("csv import (ordering-system export)", () => {
     expect(parseShirt("Shirt - Medium")).toBe("M");
     expect(parseShirt("Shirt - M")).toBe("M");
     expect(parseShirt("Shirt - XXXL")).toBe("3XL");
-    expect(parseShirt("Knit Stocking Cap")).toBeNull();
+    expect(parseShirt("Knit Stocking Cap")).toBe("Hat");
+    expect(parseShirt("Beanie")).toBe("Hat");
     expect(parseShirt("XL")).toBe("XL");
+    expect(parseShirt("")).toBeNull();
     expect(parseDivision("Mentor Division (55+ Years)")).toBe("mentors");
     expect(parseDivision("Men's Division")).toBe("mens");
     expect(parseDivision("Women's Division")).toBe("womens");
