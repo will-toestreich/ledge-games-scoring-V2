@@ -137,10 +137,13 @@ export function parseShirt(raw: string): string | null {
   return SHIRT_SIZES.includes(v) ? v : null;
 }
 
-/** "PAID" → paid, "At Event (Cash)" → cash, sponsor comps → sponsor. */
+/**
+ * "PAID" / "Credit Card" → paid (money already collected online);
+ * "At Event (Cash)" → cash (owed at the desk); sponsor comps → sponsor.
+ */
 export function parseRegistration(raw: string): Competitor["registration"] {
   const v = raw.toLowerCase();
-  if (v.includes("paid")) return "paid";
+  if (v.includes("paid") || v.includes("credit") || v.includes("card")) return "paid";
   if (v.includes("cash") || v.includes("event")) return "cash";
   if (v.includes("sponsor") || v.includes("comp")) return "sponsor";
   return null;

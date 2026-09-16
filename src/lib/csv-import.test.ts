@@ -81,8 +81,9 @@ describe("csv import (ordering-system export)", () => {
     expect(parseDivision("Mentor Division (55+ Years)")).toBe("mentors");
     expect(parseDivision("Men's Division")).toBe("mens");
     expect(parseDivision("Women's Division")).toBe("womens");
-    expect(parseRegistration("At Event (Cash)")).toBe("cash");
+    expect(parseRegistration("At Event (Cash)")).toBe("cash"); // → paid: false
     expect(parseRegistration("PAID")).toBe("paid");
+    expect(parseRegistration("Credit Card")).toBe("paid"); // → paid: true
     expect(parseRegistration("")).toBeNull();
   });
 
