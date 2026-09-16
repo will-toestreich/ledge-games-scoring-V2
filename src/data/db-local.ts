@@ -443,6 +443,62 @@ export async function resetActiveSeasonScores(): Promise<void> {
   persist();
 }
 
+/** Season-file payload: one season's data, exported/imported in isolation. */
+export interface SeasonFile {
+  settings?: Partial<Settings>;
+  competitors: Competitor[];
+  scores: AttemptScore[];
+  kegAttempts: KegAttempt[];
+}
+
+/** Parse + validate a season file. Rejects full-database backups helpfully. */
+export function parseSeasonFile(raw: string): SeasonFile {
+  let parsed: SeasonFile & { competitions?: unknown };
+  try {
+    parsed = JSON.parse(raw);
+  } catch {
+    throw new Error("That file isn't valid JSON.");
+  }
+  if (Array.isArray(parsed.competitions)) {
+    throw new Error("That's a full-database backup — restore it under Developer tools instead.");
+  }
+  if (!Array.isArray(parsed.competitors) || !Array.isArray(parsed.scores) || !Array.isArray(parsed.kegAttempts)) {
+    throw new Error("Not a season export — expected competitors, scores, and kegAttempts.");
+  }
+  return parsed;
+}
+
+/** The ACTIVE season's data as one JSON file (roster + scores + keg + settings). */
+export async function exportActiveSeason(): Promise<string> {
+  const comp = active();
+  return JSON.stringify(
+    {
+      settings: comp.settings,
+      competitors: comp.competitors,
+      scores: comp.scores,
+      kegAttempts: comp.kegAttempts,
+    },
+    null,
+    1
+  );
+}
+
+/**
+ * Replace the ACTIVE season's data from a season file. Only this season is
+ * touched, and its identity stays: name, year, and PIN are unchanged — the
+ * import swaps the roster, scores, keg attempts, and arrow-off results.
+ */
+export async function importActiveSeason(raw: string): Promise<void> {
+  const data = parseSeasonFile(raw);
+  const comp = active();
+  comp.competitors = data.competitors;
+  comp.scores = data.scores;
+  comp.kegAttempts = data.kegAttempts;
+  if (data.settings?.titleTiebreakWinners) comp.settings.titleTiebreakWinners = data.settings.titleTiebreakWinners;
+  else delete comp.settings.titleTiebreakWinners;
+  persist();
+}
+
 /**
  * Delete the ACTIVE season's entire competitor list — and with it every
  * score and keg attempt (scores without competitors are orphans). Settings

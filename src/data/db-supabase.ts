@@ -13,6 +13,7 @@ import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import type { AttemptScore, Competitor, DivisionId, KegAttempt, Settings } from "@/lib/types";
 import { buildSeed } from "./seed";
 import { DB_UPDATED_EVENT, OUTBOX_UPDATED_EVENT } from "./db-events";
+import { parseSeasonFile } from "./db-local";
 import type { CompetitionMeta, CompetitionStatus, DbStatus } from "./db-local";
 import season2025Json from "./season-2025.json";
 
@@ -168,7 +169,10 @@ interface SeasonData {
   settings: Settings;
 }
 
-async function insertSeasonChildren(competitionId: string, data: SeasonData) {
+async function insertSeasonChildren(
+  competitionId: string,
+  data: Pick<SeasonData, "competitors" | "scores" | "kegAttempts">
+) {
   const chunk = <T,>(rows: T[], n = 500): T[][] => {
     const out: T[][] = [];
     for (let i = 0; i < rows.length; i += n) out.push(rows.slice(i, i + n));
@@ -629,6 +633,39 @@ export async function resetActiveSeasonScores(): Promise<void> {
   fail((await sb().from("v2_scores").delete().eq("competition_id", id)).error);
   fail((await sb().from("v2_keg_attempts").delete().eq("competition_id", id)).error);
   fail((await sb().from("v2_competitions").update({ title_tiebreak_winners: {} }).eq("id", id)).error);
+  emitUpdated();
+}
+
+/** The ACTIVE season's data as one JSON file (roster + scores + keg + settings). */
+export async function exportActiveSeason(): Promise<string> {
+  const [competitors, scores, kegAttempts, settings] = await Promise.all([
+    fetchCompetitors(),
+    fetchScores(),
+    fetchKegAttempts(),
+    fetchSettings(),
+  ]);
+  return JSON.stringify({ settings, competitors, scores, kegAttempts }, null, 1);
+}
+
+/**
+ * Replace the ACTIVE season's data from a season file. Only this season is
+ * touched, and its identity stays: name, year, and PIN are unchanged.
+ */
+export async function importActiveSeason(raw: string): Promise<void> {
+  const data = parseSeasonFile(raw);
+  const id = await getActiveId();
+  fail((await sb().from("v2_scores").delete().eq("competition_id", id)).error);
+  fail((await sb().from("v2_keg_attempts").delete().eq("competition_id", id)).error);
+  fail((await sb().from("v2_competitors").delete().eq("competition_id", id)).error);
+  await insertSeasonChildren(id, data);
+  fail(
+    (
+      await sb()
+        .from("v2_competitions")
+        .update({ title_tiebreak_winners: data.settings?.titleTiebreakWinners ?? {} })
+        .eq("id", id)
+    ).error
+  );
   emitUpdated();
 }
 

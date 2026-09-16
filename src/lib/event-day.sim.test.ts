@@ -600,6 +600,17 @@ describe("mock event day (full simulation through the real adapter)", () => {
       note(`${div.name} champion: bib ${champ.bibNumber} ${champ.firstName} ${champ.lastName} with ${standings[0].total} pts across ${eventResults.size} events.`);
     }
 
+    // Season-scoped round-trip: export this season, wipe its scores, import
+    // it back — standings identical, identity (name/year/PIN) untouched,
+    // other seasons never involved
+    const seasonSnapshot = await db.exportActiveSeason();
+    const pinBefore = (await db.fetchSettings()).scorerPin;
+    await db.resetActiveSeasonScores();
+    await db.importActiveSeason(seasonSnapshot);
+    expect((await db.fetchSettings()).scorerPin).toBe(pinBefore);
+    // A full-database backup is rejected by the season importer, helpfully
+    await expect(db.importActiveSeason(await db.exportBackup())).rejects.toThrow(/full-database backup/);
+
     // Backup round-trip: export, re-import, standings identical, archive intact
     const before = await Promise.all(divisions.map((d) => standingsFor(d.id)));
     const backup = await db.exportBackup();

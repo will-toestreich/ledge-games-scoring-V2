@@ -1179,6 +1179,48 @@ function SettingsTab() {
   const [confirmRosterReset, setConfirmRosterReset] = useState(false);
   const [devToolsOpen, setDevToolsOpen] = useState(false);
   const [health, setHealth] = useState<HealthReport | null>(null);
+  const [csvFile, setCsvFile] = useState<File | null>(null);
+  const rosterCsvInputRef = useRef<HTMLInputElement>(null);
+  const seasonInputRef = useRef<HTMLInputElement>(null);
+  const [seasonFile, setSeasonFile] = useState<{ name: string; raw: string; summary: string } | null>(null);
+  const [seasonError, setSeasonError] = useState<string | null>(null);
+
+  async function pickSeasonFile(file: File) {
+    setSeasonError(null);
+    setSeasonFile(null);
+    const raw = await file.text();
+    try {
+      const data = db.parseSeasonFile(raw);
+      setSeasonFile({
+        name: file.name,
+        raw,
+        summary: `${data.competitors.length} competitors, ${data.scores.length} scores, ${data.kegAttempts.length} keg attempts`,
+      });
+    } catch (e) {
+      setSeasonError(e instanceof Error ? e.message : String(e));
+    }
+  }
+
+  async function applySeasonImport() {
+    if (!seasonFile) return;
+    try {
+      await downloadBackup("pre-season-import");
+      await db.importActiveSeason(seasonFile.raw);
+      qc.invalidateQueries();
+      setSeasonFile(null);
+    } catch (e) {
+      setSeasonError(e instanceof Error ? e.message : String(e));
+      setSeasonFile(null);
+    }
+  }
+
+  async function exportSeason() {
+    downloadText(
+      `ledge-games-season-${settings?.year ?? ""}-${stamp()}.json`,
+      await db.exportActiveSeason(),
+      "application/json"
+    );
+  }
   const restoreInputRef = useRef<HTMLInputElement>(null);
   const [restoreFile, setRestoreFile] = useState<{ name: string; raw: string; seasons: string[] } | null>(null);
   const [restoreError, setRestoreError] = useState<string | null>(null);
@@ -1361,86 +1403,104 @@ function SettingsTab() {
 
       <SettingsSection label="Data" icon={<Database size={16} />}>
         <div className="space-y-3 mt-3">
-          {/* Backup — everything lives in this browser until Supabase; a
-              downloaded file is the only off-device copy */}
+          {/* Roster — this season only: CSV out for the desk, CSV in via the
+              column-mapping importer (adds competitors, never deletes) */}
           <div className="flex items-center justify-between gap-4 pb-3 border-b border-border-subtle">
             <div>
-              <div className="font-medium text-sm text-text-primary">Download backup</div>
+              <div className="font-medium text-sm text-text-primary">Roster — this season</div>
               <p className="text-xs text-text-secondary">
-                Every season, roster, and score as one JSON file. Do this often — all data lives
-                in this browser until the cloud backend exists.
+                Export everyone with check-in, payment, and merch columns. Import adds
+                competitors from a CSV via column mapping.
               </p>
             </div>
-            <button onClick={() => downloadBackup()} className="btn-primary text-xs py-1.5 px-3 inline-flex items-center gap-1.5 shrink-0">
-              <Download size={13} /> Download
-            </button>
-          </div>
-          <div className="pb-3 border-b border-border-subtle">
-            <div className="flex items-center justify-between gap-4">
-              <div>
-                <div className="font-medium text-sm text-text-primary">Restore from backup</div>
-                <p className="text-xs text-text-secondary">Replaces ALL current data with the backup file's contents.</p>
-              </div>
+            <div className="flex gap-2 shrink-0">
+              <button onClick={exportRoster} className="btn-secondary text-xs py-1.5 px-3 inline-flex items-center gap-1.5">
+                <Download size={13} /> Export CSV
+              </button>
               <button
-                onClick={() => restoreInputRef.current?.click()}
-                className="btn-secondary text-xs py-1.5 inline-flex items-center gap-1.5 shrink-0"
+                onClick={() => rosterCsvInputRef.current?.click()}
+                className="btn-secondary text-xs py-1.5 px-3 inline-flex items-center gap-1.5"
               >
-                <Upload size={13} /> Choose file
+                <Upload size={13} /> Import CSV…
               </button>
               <input
-                ref={restoreInputRef}
+                ref={rosterCsvInputRef}
                 type="file"
-                accept=".json,application/json"
+                accept=".csv"
                 className="hidden"
                 onChange={(e) => {
                   const f = e.target.files?.[0];
-                  if (f) pickRestoreFile(f);
+                  if (f) setCsvFile(f);
                   e.target.value = "";
                 }}
               />
             </div>
-            {restoreError && <p className="text-xs text-red-400 mt-2">{restoreError}</p>}
-            {restoreFile && (
+          </div>
+
+          {/* Results — this season only: the awards CSV, plus a JSON pair that
+              round-trips the season's data (name/year/PIN stay untouched) */}
+          <div className="pb-3 border-b border-border-subtle">
+            <div className="flex items-center justify-between gap-4">
+              <div>
+                <div className="font-medium text-sm text-text-primary">Results — this season</div>
+                <p className="text-xs text-text-secondary">
+                  Awards CSV: standings with per-event points. Export/Import: this season's full
+                  data as JSON (roster + every score) — import replaces the season's data; its
+                  name, year, and PIN are unchanged.
+                </p>
+              </div>
+              <div className="flex gap-2 shrink-0">
+                <button onClick={exportResults} className="btn-secondary text-xs py-1.5 px-3 inline-flex items-center gap-1.5">
+                  <Trophy size={13} /> Awards CSV
+                </button>
+                <button onClick={exportSeason} className="btn-secondary text-xs py-1.5 px-3 inline-flex items-center gap-1.5">
+                  <Download size={13} /> Export
+                </button>
+                <button
+                  onClick={() => seasonInputRef.current?.click()}
+                  className="btn-secondary text-xs py-1.5 px-3 inline-flex items-center gap-1.5"
+                >
+                  <Upload size={13} /> Import…
+                </button>
+                <input
+                  ref={seasonInputRef}
+                  type="file"
+                  accept=".json,application/json"
+                  className="hidden"
+                  onChange={(e) => {
+                    const f = e.target.files?.[0];
+                    if (f) pickSeasonFile(f);
+                    e.target.value = "";
+                  }}
+                />
+              </div>
+            </div>
+            {seasonError && <p className="text-xs text-red-400 mt-2">{seasonError}</p>}
+            {seasonFile && (
               <div className="mt-3 rounded-lg border border-amber-500/30 bg-amber-500/10 p-3">
                 <p className="text-xs text-amber-400 font-medium mb-1.5">
-                  {restoreFile.name} contains {restoreFile.seasons.length} season{restoreFile.seasons.length !== 1 ? "s" : ""}:
+                  {seasonFile.name}: {seasonFile.summary}. This replaces “{settings.competitionName}{" "}
+                  {settings.year}”'s current data ({competitors?.length ?? 0} competitors,{" "}
+                  {scores?.length ?? 0} scores). Other seasons are untouched.
                 </p>
-                <ul className="text-xs text-text-secondary mb-2.5 space-y-0.5">
-                  {restoreFile.seasons.map((s, i) => (
-                    <li key={i}>· {s}</li>
-                  ))}
-                </ul>
+                {activeComp?.status !== "active" && (
+                  <p className="text-xs font-bold text-red-400 mb-1.5">
+                    ⚠ You are viewing an ARCHIVED season — importing over it rewrites history.
+                  </p>
+                )}
                 <div className="flex gap-2">
-                  <button onClick={applyRestore} className="text-xs font-medium px-3 py-1.5 rounded-lg bg-red-500 text-white">
-                    Replace everything with this backup
+                  <button onClick={applySeasonImport} className="text-xs font-medium px-3 py-1.5 rounded-lg bg-red-500 text-white">
+                    Replace this season's data
                   </button>
-                  <button onClick={() => setRestoreFile(null)} className="btn-secondary text-xs py-1.5 px-3">
+                  <button onClick={() => setSeasonFile(null)} className="btn-secondary text-xs py-1.5 px-3">
                     Cancel
                   </button>
                 </div>
                 <p className="text-[11px] text-text-tertiary mt-2">
-                  A snapshot of the current data downloads first, so this is always undoable.
+                  A full backup downloads first, so this is always undoable.
                 </p>
               </div>
             )}
-          </div>
-          {/* CSV exports: the awards-ceremony results sheet + the desk roster */}
-          <div className="flex items-center justify-between gap-4 pb-3 border-b border-border-subtle">
-            <div>
-              <div className="font-medium text-sm text-text-primary">Export CSVs</div>
-              <p className="text-xs text-text-secondary">
-                Results: standings with per-event points, all divisions — the awards sheet.
-                Roster: everyone with check-in, payment, and merch columns — for the desk.
-              </p>
-            </div>
-            <div className="flex gap-2 shrink-0">
-              <button onClick={exportResults} className="btn-secondary text-xs py-1.5 px-3 inline-flex items-center gap-1.5">
-                <Trophy size={13} /> Results
-              </button>
-              <button onClick={exportRoster} className="btn-secondary text-xs py-1.5 px-3 inline-flex items-center gap-1.5">
-                <Users size={13} /> Roster
-              </button>
-            </div>
           </div>
 
           {/* Reset scores — the "clear the test scoring, run the real day" tool.
@@ -1499,7 +1559,7 @@ function SettingsTab() {
           <div className="pb-3 border-b border-border-subtle">
             <div className="flex items-center justify-between gap-4">
               <div>
-                <div className="font-medium text-sm text-text-primary">Reset competitor list</div>
+                <div className="font-medium text-sm text-text-primary">Reset active season competitor list</div>
                 <p className="text-xs text-text-secondary">
                   Deletes every competitor in the active season — and with them all recorded
                   scores. Settings and PIN are kept. Use after a bad import.
@@ -1598,7 +1658,65 @@ function SettingsTab() {
               Developer tools
             </button>
             {devToolsOpen && (
-              <div className="mt-3 flex items-center justify-between gap-4">
+              <div className="mt-3 space-y-3">
+                <div className="pb-3 border-b border-border-subtle">
+                  <div className="flex items-center justify-between gap-4">
+                    <div>
+                      <div className="font-medium text-sm text-text-primary">Backup &amp; restore — full database</div>
+                      <p className="text-xs text-text-secondary">
+                        Every season in one JSON file. Restore replaces ALL seasons; a snapshot
+                        downloads first.
+                      </p>
+                    </div>
+                    <div className="flex gap-2 shrink-0">
+                      <button onClick={() => downloadBackup()} className="btn-secondary text-xs py-1.5 px-3 inline-flex items-center gap-1.5">
+                        <Download size={13} /> Download
+                      </button>
+                      <button
+                        onClick={() => restoreInputRef.current?.click()}
+                        className="btn-secondary text-xs py-1.5 px-3 inline-flex items-center gap-1.5"
+                      >
+                        <Upload size={13} /> Restore…
+                      </button>
+                      <input
+                        ref={restoreInputRef}
+                        type="file"
+                        accept=".json,application/json"
+                        className="hidden"
+                        onChange={(e) => {
+                          const f = e.target.files?.[0];
+                          if (f) pickRestoreFile(f);
+                          e.target.value = "";
+                        }}
+                      />
+                    </div>
+                  </div>
+                  {restoreError && <p className="text-xs text-red-400 mt-2">{restoreError}</p>}
+                  {restoreFile && (
+                    <div className="mt-3 rounded-lg border border-amber-500/30 bg-amber-500/10 p-3">
+                      <p className="text-xs text-amber-400 font-medium mb-1.5">
+                        {restoreFile.name} contains {restoreFile.seasons.length} season{restoreFile.seasons.length !== 1 ? "s" : ""}:
+                      </p>
+                      <ul className="text-xs text-text-secondary mb-2.5 space-y-0.5">
+                        {restoreFile.seasons.map((s, i) => (
+                          <li key={i}>· {s}</li>
+                        ))}
+                      </ul>
+                      <div className="flex gap-2">
+                        <button onClick={applyRestore} className="text-xs font-medium px-3 py-1.5 rounded-lg bg-red-500 text-white">
+                          Replace everything with this backup
+                        </button>
+                        <button onClick={() => setRestoreFile(null)} className="btn-secondary text-xs py-1.5 px-3">
+                          Cancel
+                        </button>
+                      </div>
+                      <p className="text-[11px] text-text-tertiary mt-2">
+                        A snapshot of the current data downloads first, so this is always undoable.
+                      </p>
+                    </div>
+                  )}
+                </div>
+                <div className="flex items-center justify-between gap-4">
                 <div>
                   <div className="font-medium text-sm text-text-primary">Reset to demo data</div>
                   <p className="text-xs text-text-secondary">
@@ -1614,11 +1732,16 @@ function SettingsTab() {
                 >
                   <RotateCcw size={13} /> {confirmData === "demo" ? "Really overwrite active season?" : "Reset demo"}
                 </button>
+                </div>
               </div>
             )}
           </div>
         </div>
       </SettingsSection>
+
+      {csvFile && competitors && (
+        <CsvImportModal file={csvFile} competitors={competitors} onClose={() => setCsvFile(null)} />
+      )}
     </div>
   );
 }
