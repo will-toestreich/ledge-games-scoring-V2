@@ -19,7 +19,7 @@ describe("csv import (ordering-system export)", () => {
   const raw = readFileSync("scripts/data-2025/roster.csv", "utf8");
   const parsed = Papa.parse<string[]>(raw, { skipEmptyLines: "greedy" });
   const grid = gridFromMatrix(parsed.data as string[][]);
-  const mapping = detectMapping(grid.headers);
+  const mapping = detectMapping(grid);
 
   it("auto-detects the ordering system's headers", () => {
     expect(mapping.bib).toBe("Bib");
@@ -118,7 +118,7 @@ describe("csv import (ordering-system export)", () => {
       ["9", "Dupe Bib", "Men's Division"],
       ["9", "Dupe Bib Two", "Men's Division"],
     ]);
-    const rows = buildCompetitors(g.rows, detectMapping(g.headers), []);
+    const rows = buildCompetitors(g.rows, detectMapping(g), []);
     expect(rows.map((r) => r.errors[0] ?? "ok")).toEqual([
       "bad bib",
       "missing name",
@@ -137,7 +137,7 @@ describe("csv import (ordering-system export)", () => {
       ["4", "Comped", "Men's Division", "Sponsor"],
       ["5", "No Info", "Men's Division", ""],
     ]);
-    const rows = buildCompetitors(g.rows, detectMapping(g.headers), []);
+    const rows = buildCompetitors(g.rows, detectMapping(g), []);
     expect(rows.map((r) => [r.competitor!.registration, r.competitor!.paid])).toEqual([
       ["paid", true],
       ["paid", true],
@@ -157,7 +157,7 @@ describe("csv import (ordering-system export)", () => {
       ["2", "Babe", "Blue", "womens", "", "", "", "M", "cash", "yes"], // paid override: cash but collected
       ["3", "Card", "Payer", "mens", "", "", "", "", "credit card", ""], // blank Paid → derived true
     ]);
-    const m = detectMapping(g.headers);
+    const m = detectMapping(g);
     expect(m.registration).toBe("Registration (paid/cash/sponsor)");
     expect(m.paid).toBe("Paid (yes/no)"); // must NOT be swallowed by registration
     expect(m.firstName).toBe("First Name");
@@ -171,6 +171,38 @@ describe("csv import (ordering-system export)", () => {
     ]);
   });
 
+  it("a column NAMED Registration holding division values maps to Division", () => {
+    // The ordering system's "Registration" column contains the product the
+    // person bought — which IS their division. Detection checks values, not
+    // just header names.
+    const g = gridFromMatrix([
+      ["Bib", "Name", "Registration", "Lineitem variant"],
+      ["1", "Zack Todd", "Men's Division Registration", "Paid"],
+      ["101", "Willa Birch", "Women's Division Registration", "No"],
+    ]);
+    const m = detectMapping(g);
+    expect(m.division).toBe("Registration");
+    expect(m.registration).toBeUndefined(); // not claimed by a division column
+    const rows = buildCompetitors(g.rows, { ...m, paid: "Lineitem variant" }, []);
+    expect(rows.map((r) => [r.competitor!.divisionId, r.competitor!.paid])).toEqual([
+      ["mens", true],
+      ["womens", false],
+    ]);
+  });
+
+  it("division hiding under ANY header name is found by its values", () => {
+    const g = gridFromMatrix([
+      ["Bib", "Name", "Lineitem name"],
+      ["1", "Zack Todd", "Mentor Division (55+ Years)"],
+    ]);
+    expect(detectMapping(g).division).toBe("Lineitem name");
+    // Fuzzy value parsing — word boundaries keep "Payment" from reading as men's
+    expect(parseDivision("Men's Division Registration")).toBe("mens");
+    expect(parseDivision("Women's Division Registration")).toBe("womens");
+    expect(parseDivision("Payment")).toBeNull();
+    expect(parseDivision("Kids")).toBeNull();
+  });
+
   it("blank division infers from the bib block, flagged", () => {
     const g = gridFromMatrix([
       ["Bib", "Name", "Division"],
@@ -178,7 +210,7 @@ describe("csv import (ordering-system export)", () => {
       ["117", "Blank Div Woman", ""],
       ["152", "Blank Div Mentor", ""],
     ]);
-    const rows = buildCompetitors(g.rows, detectMapping(g.headers), []);
+    const rows = buildCompetitors(g.rows, detectMapping(g), []);
     expect(rows.map((r) => r.competitor?.divisionId)).toEqual(["mens", "womens", "mentors"]);
     expect(rows.every((r) => r.inferredDivision)).toBe(true);
   });

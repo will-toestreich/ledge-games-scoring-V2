@@ -43,7 +43,7 @@ export function CsvImportModal({
       complete: (res) => {
         const g = gridFromMatrix(res.data as string[][]);
         setGrid(g);
-        setMapping(detectMapping(g.headers));
+        setMapping(detectMapping(g));
       },
       error: (e) => setParseError(String(e)),
     });
@@ -96,6 +96,9 @@ export function CsvImportModal({
                   <span className="text-xs font-medium text-text-primary pt-2">
                     {f.label}
                     {f.required && <span className="text-red-400"> *</span>}
+                    {f.hint && (
+                      <span className="block text-[10px] font-normal text-text-tertiary mt-0.5">{f.hint}</span>
+                    )}
                   </span>
                   <div className="min-w-0">
                     <select

@@ -59,7 +59,28 @@ export function sampleValues(grid: CsvGrid, header: string, n = 3): string[] {
 
 // ─── Column mapping ────────────────────────────────────────
 
-export const MAPPING_FIELDS = [
+export type MappingField =
+  | "bib"
+  | "fullName"
+  | "firstName"
+  | "lastName"
+  | "division"
+  | "nickname"
+  | "hometown"
+  | "email"
+  | "shirtSize"
+  | "registration"
+  | "paid";
+
+export interface MappingFieldDef {
+  key: MappingField;
+  label: string;
+  required: boolean;
+  /** Small reminder under the label, e.g. which export column usually holds this. */
+  hint?: string;
+}
+
+export const MAPPING_FIELDS: readonly MappingFieldDef[] = [
   { key: "bib", label: "Bib #", required: true },
   { key: "fullName", label: "Full name", required: false },
   { key: "firstName", label: "First name", required: false },
@@ -69,11 +90,9 @@ export const MAPPING_FIELDS = [
   { key: "hometown", label: "Hometown", required: false },
   { key: "email", label: "Email", required: false },
   { key: "shirtSize", label: "Shirt size", required: false },
-  { key: "registration", label: "Registration", required: false },
-  { key: "paid", label: "Paid (yes/no)", required: false },
-] as const;
-
-export type MappingField = (typeof MAPPING_FIELDS)[number]["key"];
+  { key: "registration", label: "Registration", required: false, hint: "payment type: paid / cash / sponsor" },
+  { key: "paid", label: "Paid (yes/no)", required: false, hint: "“Lineitem variant” in the export" },
+];
 /** Field → the CSV header (raw spelling) it reads from. */
 export type CsvMapping = Partial<Record<MappingField, string>>;
 
@@ -88,12 +107,16 @@ const HEADER_ALIASES: Record<MappingField, string[]> = {
   email: ["email", "emailaddress"],
   shirtSize: ["shirtsize", "shirt", "shirthat", "size", "tshirt", "tshirtsize"],
   // NOT "paid" — a column named Paid is the collected-flag, below
-  registration: ["registration", "reg", "registrationpaidcashsponsor", "payment", "paymentstatus"],
+  registration: ["registration", "reg", "registrationpaidcashsponsor", "payment", "paymentstatus", "financialstatus", "paymentmethod"],
   paid: ["paid", "paidyesno", "collected", "paymentcollected"],
 };
 
-/** Best-guess mapping from the CSV's headers; every guess is overridable. */
-export function detectMapping(headers: string[]): CsvMapping {
+/**
+ * Best-guess mapping — by header name first, then verified against the
+ * column's actual VALUES; every guess is overridable in the mapping UI.
+ */
+export function detectMapping(grid: CsvGrid): CsvMapping {
+  const { headers } = grid;
   const mapping: CsvMapping = {};
   const used = new Set<string>();
   for (const field of MAPPING_FIELDS) {
@@ -106,8 +129,28 @@ export function detectMapping(headers: string[]): CsvMapping {
       }
     }
   }
-  // A detected full-name column supersedes split names and vice versa —
-  // both mapped is fine (first/last win), but don't double-claim one header
+
+  const allDivisions = (header: string) => {
+    const samples = sampleValues(grid, header, 5);
+    return samples.length > 0 && samples.every((v) => parseDivision(v) !== null);
+  };
+
+  // Ordering systems name the division column "Registration" — the product
+  // someone buys IS their division registration. If the column claimed for
+  // Registration actually holds division values, it belongs to Division.
+  if (mapping.registration && !mapping.division && allDivisions(mapping.registration)) {
+    mapping.division = mapping.registration;
+    delete mapping.registration;
+  }
+  // Still no division? Look for ANY unclaimed column whose values are
+  // divisions ("Lineitem name", "Product", whatever the export calls it).
+  if (!mapping.division) {
+    const hit = headers.find((h) => !used.has(h) && allDivisions(h));
+    if (hit) {
+      mapping.division = hit;
+      used.add(hit);
+    }
+  }
   return mapping;
 }
 
@@ -121,7 +164,15 @@ const DIVISION_VALUES: Record<string, DivisionId> = {
 };
 
 export function parseDivision(raw: string): DivisionId | null {
-  return DIVISION_VALUES[norm(raw)] ?? null;
+  const exact = DIVISION_VALUES[norm(raw)];
+  if (exact) return exact;
+  // Fuzzy fallback for product-style values ("Men's Division Registration").
+  // Word boundaries matter: "payment" must not read as men's.
+  const v = raw.toLowerCase();
+  if (/\bwomen|\bfemale\b/.test(v)) return "womens";
+  if (/\bmentor/.test(v)) return "mentors";
+  if (/\bmen\b|\bmen'?s\b|\bmale\b/.test(v)) return "mens";
+  return null;
 }
 
 /**
