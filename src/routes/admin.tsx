@@ -245,7 +245,7 @@ function Checkbox({
 
 type SortKey =
   | "bib" | "name" | "email" | "division" | "nickname" | "hometown"
-  | "shirt" | "reg" | "paid" | "checkedIn" | "noShow";
+  | "shirt" | "paid" | "checkedIn" | "noShow";
 
 interface SortState {
   key: SortKey;
@@ -261,7 +261,6 @@ const sortValue: Record<SortKey, (c: Competitor) => string | number | boolean | 
   nickname: (c) => c.nickname?.toLowerCase() ?? null,
   hometown: (c) => c.hometown?.toLowerCase() ?? null,
   shirt: (c) => (c.shirtSize ? SHIRT_SIZES.indexOf(c.shirtSize) : null),
-  reg: (c) => c.registration ?? null,
   paid: (c) => !c.paid, // checked first on ascending
   checkedIn: (c) => !c.checkedIn,
   noShow: (c) => !c.noShow,
@@ -309,7 +308,6 @@ function CompetitorsTab() {
   const { data: competitors } = useCompetitors();
   const update = useUpdateCompetitor();
   const [divisionFilter, setDivisionFilter] = useState<string | null>(null);
-  const [regFilter, setRegFilter] = useState<string | null>(null);
   const [shirtFilter, setShirtFilter] = useState<string | null>(null);
   const [paidFilter, setPaidFilter] = useState<boolean | null>(null);
   const [checkinFilter, setCheckinFilter] = useState<string | null>(null);
@@ -328,7 +326,6 @@ function CompetitorsTab() {
 
   const filtered = competitors.filter((c) => {
     if (divisionFilter && c.divisionId !== divisionFilter) return false;
-    if (regFilter && c.registration !== regFilter) return false;
     if (shirtFilter && c.shirtSize !== shirtFilter) return false;
     if (paidFilter !== null && c.paid !== paidFilter) return false;
     if (checkinFilter === "ready" && !c.checkedIn) return false;
@@ -359,7 +356,7 @@ function CompetitorsTab() {
   });
 
   const totalCheckedIn = competitors.filter((c) => c.checkedIn).length;
-  const totalRegistered = competitors.filter((c) => c.registration !== null).length;
+  const totalPaid = competitors.filter((c) => c.paid).length;
   // A brand-new season has zero competitors — never divide by it
   const rosterPct = (n: number) =>
     competitors.length > 0 ? Math.round((n / competitors.length) * 100) : 0;
@@ -376,10 +373,9 @@ function CompetitorsTab() {
       "Hometown",
       "Email",
       "Shirt Size",
-      "Registration (paid/cash/sponsor)",
       "Paid (yes/no)",
     ];
-    const example = ["1", "Paul", "Bunyan", "mens", "The Axe", '"Brainerd, MN"', "paul@example.com", "XL", "cash", "no"];
+    const example = ["1", "Paul", "Bunyan", "mens", "The Axe", '"Brainerd, MN"', "paul@example.com", "XL", "no"];
     const blob = new Blob([headers.join(",") + "\n" + example.join(",") + "\n"], { type: "text/csv" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
@@ -399,12 +395,12 @@ function CompetitorsTab() {
           <div className="text-xs text-text-secondary mt-0.5">competitors</div>
         </div>
         <div className="card rounded-xl p-4">
-          <div className="text-xs text-text-tertiary font-medium uppercase tracking-wider mb-1">Registered</div>
+          <div className="text-xs text-text-tertiary font-medium uppercase tracking-wider mb-1">Paid</div>
           <div className="text-2xl font-bold text-text-primary">
-            {totalRegistered} <span className="text-sm font-normal text-text-tertiary">/ {competitors.length}</span>
+            {totalPaid} <span className="text-sm font-normal text-text-tertiary">/ {competitors.length}</span>
           </div>
           <div className="h-1.5 rounded-full bg-surface-overlay overflow-hidden mt-2">
-            <div className="h-full rounded-full bg-blue-500" style={{ width: `${rosterPct(totalRegistered)}%` }} />
+            <div className="h-full rounded-full bg-blue-500" style={{ width: `${rosterPct(totalPaid)}%` }} />
           </div>
         </div>
         <div className="card rounded-xl p-4">
@@ -484,16 +480,6 @@ function CompetitorsTab() {
         </div>
         <div className="w-px h-5 bg-border-subtle" />
         <div className="flex items-center gap-1.5 flex-wrap">
-          <span className="text-[10px] text-text-tertiary uppercase tracking-wider font-medium mr-1">Reg</span>
-          <FilterPill active={regFilter === null} onClick={() => setRegFilter(null)}>All</FilterPill>
-          {["paid", "cash", "sponsor"].map((r) => (
-            <FilterPill key={r} active={regFilter === r} onClick={() => setRegFilter(regFilter === r ? null : r)}>
-              {r[0].toUpperCase() + r.slice(1)}
-            </FilterPill>
-          ))}
-        </div>
-        <div className="w-px h-5 bg-border-subtle" />
-        <div className="flex items-center gap-1.5 flex-wrap">
           <span className="text-[10px] text-text-tertiary uppercase tracking-wider font-medium mr-1">Shirt</span>
           <FilterPill active={!shirtFilter} onClick={() => setShirtFilter(null)}>All</FilterPill>
           {SHIRT_SIZES.map((size) => (
@@ -546,7 +532,6 @@ function CompetitorsTab() {
                 {(
                   [
                     { label: "Shirt", key: "shirt" },
-                    { label: "Reg", key: "reg" },
                     { label: "Paid", key: "paid" },
                     { label: "Check-in", key: "checkedIn" },
                     { label: "No-show", key: "noShow" },
@@ -576,11 +561,6 @@ function CompetitorsTab() {
                     <td className="px-3 py-2 text-text-tertiary text-xs">{c.nickname ?? "—"}</td>
                     <td className="px-3 py-2 text-text-secondary text-xs">{c.hometown ?? "—"}</td>
                     <td className="px-3 py-2 text-center text-text-secondary text-xs">{c.shirtSize ?? "—"}</td>
-                    <td className="px-3 py-2 text-center">
-                      <span className={`text-[10px] font-medium uppercase ${c.registration ? "text-text-primary" : "text-text-tertiary"}`}>
-                        {c.registration ?? "—"}
-                      </span>
-                    </td>
                     <td className="px-3 py-2 text-center">
                       <Checkbox checked={c.paid} label={`Paid: ${c.firstName} ${c.lastName}`} onToggle={() => update.mutate({ id: c.id, patch: { paid: !c.paid } })} />
                     </td>

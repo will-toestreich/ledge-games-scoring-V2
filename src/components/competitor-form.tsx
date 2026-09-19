@@ -80,7 +80,6 @@ export function CompetitorFormModal({
   const [hometown, setHometown] = useState(competitor?.hometown ?? "");
   const [email, setEmail] = useState(competitor?.email ?? "");
   const [shirtSize, setShirtSize] = useState(competitor?.shirtSize ?? "");
-  const [registration, setRegistration] = useState<string>(competitor?.registration ?? "cash");
   const [paid, setPaid] = useState(competitor?.paid ?? true);
   const [checkedIn, setCheckedIn] = useState(competitor?.checkedIn ?? true);
   const [confirmDelete, setConfirmDelete] = useState(false);
@@ -109,7 +108,6 @@ export function CompetitorFormModal({
       hometown: hometown.trim() || null,
       email: email.trim() || null,
       shirtSize: shirtSize || null,
-      registration: (registration || null) as Competitor["registration"],
       paid,
       checkedIn,
     };
@@ -127,7 +125,7 @@ export function CompetitorFormModal({
       }
     } else {
       add.mutate(
-        [{ id: newCompetitorId(bibNum), noShow: false, eventSkips: [], ...patch }],
+        [{ id: newCompetitorId(bibNum), noShow: false, eventSkips: [], registration: null, ...patch }],
         { onSuccess: onClose, onError: (e) => setError(String(e)) }
       );
     }
@@ -177,14 +175,6 @@ export function CompetitorFormModal({
         </Field>
         <Field label="Email" span2>
           <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} className="input py-2" />
-        </Field>
-        <Field label="Registration">
-          <select value={registration} onChange={(e) => setRegistration(e.target.value)} className="input py-2">
-            <option value="paid">Paid (online)</option>
-            <option value="cash">Cash at event</option>
-            <option value="sponsor">Sponsor</option>
-            <option value="">Not registered</option>
-          </select>
         </Field>
         <div className="flex items-end gap-4 pb-1">
           <label className="flex items-center gap-2 text-sm text-text-secondary">

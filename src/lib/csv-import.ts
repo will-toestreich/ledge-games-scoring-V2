@@ -69,7 +69,6 @@ export type MappingField =
   | "hometown"
   | "email"
   | "shirtSize"
-  | "registration"
   | "paid";
 
 export interface MappingFieldDef {
@@ -90,8 +89,12 @@ export const MAPPING_FIELDS: readonly MappingFieldDef[] = [
   { key: "hometown", label: "Hometown", required: false },
   { key: "email", label: "Email", required: false },
   { key: "shirtSize", label: "Shirt size", required: false },
-  { key: "registration", label: "Registration", required: false, hint: "payment type: paid / cash / sponsor" },
-  { key: "paid", label: "Paid (yes/no)", required: false, hint: "“Lineitem variant” in the export" },
+  {
+    key: "paid",
+    label: "Paid (yes/no)",
+    required: false,
+    hint: "“Lineitem price” in the export — accepts yes/no, payment types, or an amount (nonzero = paid)",
+  },
 ];
 /** Field → the CSV header (raw spelling) it reads from. */
 export type CsvMapping = Partial<Record<MappingField, string>>;
@@ -101,14 +104,12 @@ const HEADER_ALIASES: Record<MappingField, string[]> = {
   fullName: ["name", "fullname", "competitor", "competitorname"],
   firstName: ["firstname", "first"],
   lastName: ["lastname", "last"],
-  division: ["division", "div", "menswomensmentor", "menswomensmentors", "divisionmenswomensmentors"],
+  division: ["division", "div", "selectyourdivision", "menswomensmentor", "menswomensmentors", "divisionmenswomensmentors"],
   nickname: ["nickname", "nick"],
   hometown: ["hometown", "city", "town"],
   email: ["email", "emailaddress"],
-  shirtSize: ["shirtsize", "shirt", "shirthat", "size", "tshirt", "tshirtsize"],
-  // NOT "paid" — a column named Paid is the collected-flag, below
-  registration: ["registration", "reg", "registrationpaidcashsponsor", "payment", "paymentstatus", "financialstatus", "paymentmethod"],
-  paid: ["paid", "paidyesno", "collected", "paymentcollected"],
+  shirtSize: ["shirtsize", "shirt", "shirthat", "shirtsizestockingcap", "size", "tshirt", "tshirtsize"],
+  paid: ["paid", "paidyesno", "lineitemprice", "collected", "paymentcollected", "financialstatus", "paymentstatus", "paymentmethod"],
 };
 
 /**
@@ -119,9 +120,15 @@ export function detectMapping(grid: CsvGrid): CsvMapping {
   const { headers } = grid;
   const mapping: CsvMapping = {};
   const used = new Set<string>();
+  // The ordering system prefixes its form fields: "Product Form: Hometown".
+  // Match aliases against the header as-is AND with that prefix stripped.
+  const candidates = (h: string): string[] => {
+    const n = norm(h);
+    return n.startsWith("productform") ? [n, n.slice("productform".length)] : [n];
+  };
   for (const field of MAPPING_FIELDS) {
     for (const alias of HEADER_ALIASES[field.key]) {
-      const hit = headers.find((h) => !used.has(h) && norm(h) === alias);
+      const hit = headers.find((h) => !used.has(h) && candidates(h).includes(alias));
       if (hit) {
         mapping[field.key] = hit;
         used.add(hit);
@@ -135,15 +142,9 @@ export function detectMapping(grid: CsvGrid): CsvMapping {
     return samples.length > 0 && samples.every((v) => parseDivision(v) !== null);
   };
 
-  // Ordering systems name the division column "Registration" — the product
-  // someone buys IS their division registration. If the column claimed for
-  // Registration actually holds division values, it belongs to Division.
-  if (mapping.registration && !mapping.division && allDivisions(mapping.registration)) {
-    mapping.division = mapping.registration;
-    delete mapping.registration;
-  }
-  // Still no division? Look for ANY unclaimed column whose values are
-  // divisions ("Lineitem name", "Product", whatever the export calls it).
+  // No division found by name? Look for ANY unclaimed column whose VALUES
+  // are divisions — ordering systems put it under "Registration" (the
+  // product bought IS the division), "Lineitem name", or anything else.
   if (!mapping.division) {
     const hit = headers.find((h) => !used.has(h) && allDivisions(h));
     if (hit) {
@@ -191,23 +192,22 @@ export function parseShirt(raw: string): string | null {
   return SHIRT_SIZES.includes(v) ? v : null;
 }
 
-/** Collected flag: yes/y/true/x/1/paid → true; no/n/false/0 → false; else null. */
-export function parsePaid(raw: string): boolean | null {
-  const v = norm(raw);
-  if (["yes", "y", "true", "x", "1", "paid"].includes(v)) return true;
-  if (["no", "n", "false", "0", "unpaid"].includes(v)) return false;
-  return null;
-}
-
 /**
- * "PAID" / "Credit Card" → paid (money already collected online);
- * "At Event (Cash)" → cash (owed at the desk); sponsor comps → sponsor.
+ * Collected flag, tolerant of every shape the exports use:
+ * yes/y/true/x/paid → true; no/n/false/unpaid → false;
+ * payment types: Credit Card / PAID / Sponsor → true, At Event (Cash) → false;
+ * amounts ("Lineitem price"): nonzero → true, zero → false; else null.
  */
-export function parseRegistration(raw: string): Competitor["registration"] {
-  const v = raw.toLowerCase();
-  if (v.includes("paid") || v.includes("credit") || v.includes("card")) return "paid";
-  if (v.includes("cash") || v.includes("event")) return "cash";
-  if (v.includes("sponsor") || v.includes("comp")) return "sponsor";
+export function parsePaid(raw: string): boolean | null {
+  const v = raw.toLowerCase().trim();
+  if (v === "") return null;
+  if (/credit|card|sponsor|\bcomp/.test(v)) return true;
+  if (/cash|event/.test(v)) return false;
+  const n = norm(raw);
+  if (["yes", "y", "true", "x", "paid"].includes(n)) return true;
+  if (["no", "n", "false", "unpaid"].includes(n)) return false;
+  const amount = Number(v.replace(/[$,\s]/g, ""));
+  if (v.replace(/[$,\s]/g, "") !== "" && Number.isFinite(amount)) return amount > 0;
   return null;
 }
 
@@ -263,11 +263,8 @@ export function buildCompetitors(
     if (!divisionId) errors.push(divRaw ? `unknown division "${divRaw}"` : "missing division");
 
     if (errors.length === 0) takenBibs.add(bib);
-    // Money owed at the desk only for cash-at-event (and unknown) rows:
-    // online payments AND sponsor comps import as already settled. A mapped
-    // Paid column overrides that default where its cell is decisive.
-    const registration = parseRegistration(col(raw, "registration"));
-    const paid = parsePaid(col(raw, "paid")) ?? (registration === "paid" || registration === "sponsor");
+    // Owed at the desk unless the Paid column says otherwise
+    const paid = parsePaid(col(raw, "paid")) ?? false;
     return {
       line: i + 2, // header is line 1
       errors,
@@ -286,7 +283,9 @@ export function buildCompetitors(
               hometown: col(raw, "hometown") || null,
               email: col(raw, "email") || null,
               shirtSize: parseShirt(col(raw, "shirtSize")),
-              registration: registration ?? "cash",
+              // Registration (payment type) is retired as a UI concept; the
+              // field stays in the data model for old seasons and backups
+              registration: null,
               paid,
               checkedIn: false,
               noShow: false,

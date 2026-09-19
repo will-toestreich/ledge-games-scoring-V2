@@ -161,7 +161,7 @@ export function CsvImportModal({
             <table className="w-full text-xs">
               <thead className="sticky top-0 bg-surface-overlay">
                 <tr>
-                  {["", "Bib", "Name", "Division", "Shirt", "Reg", "Issue"].map((h) => (
+                  {["", "Bib", "Name", "Division", "Shirt", "Paid", "Issue"].map((h) => (
                     <th
                       key={h}
                       className="px-2 py-1.5 text-left text-text-tertiary font-medium uppercase tracking-wider text-[10px]"
@@ -197,7 +197,7 @@ export function CsvImportModal({
                         {div?.name ?? "—"}
                       </td>
                       <td className="px-2 py-1.5 text-text-secondary">{c?.shirtSize ?? "—"}</td>
-                      <td className="px-2 py-1.5 text-text-secondary">{c?.registration ?? "—"}</td>
+                      <td className="px-2 py-1.5 text-text-secondary">{c ? (c.paid ? "yes" : "no") : "—"}</td>
                       <td className="px-2 py-1.5">
                         {r.errors.length > 0 ? (
                           <span className="text-amber-400">{r.errors.join(", ")}</span>

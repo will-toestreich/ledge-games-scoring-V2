@@ -9,7 +9,7 @@ import {
   detectMapping,
   gridFromMatrix,
   parseDivision,
-  parseRegistration,
+  parsePaid,
   parseShirt,
   sampleValues,
 } from "./csv-import";
@@ -26,14 +26,15 @@ describe("csv import (ordering-system export)", () => {
     expect(mapping.fullName).toBe("Name");
     expect(mapping.division).toBe("Mens / Womens / Mentor");
     expect(mapping.shirtSize).toBe("Shirt / Hat"); // previously dropped silently
-    expect(mapping.registration).toBe("Registration");
     expect(mapping.nickname).toBe("Nickname");
     expect(mapping.hometown).toBe("Hometown");
     expect(mapping.email).toBe("Email");
   });
 
   it("imports the real 2025 export end to end", () => {
-    const rows = buildCompetitors(grid.rows, mapping, []);
+    // The 2025 sheet's "Registration" column holds payment types — map it
+    // to Paid, which understands them
+    const rows = buildCompetitors(grid.rows, { ...mapping, paid: "Registration" }, []);
     const valid = rows.filter((r) => r.competitor !== null);
     expect(valid.length).toBeGreaterThan(100);
 
@@ -54,12 +55,10 @@ describe("csv import (ordering-system export)", () => {
     expect(shirts.length).toBeGreaterThan(50);
     for (const s of new Set(shirts)) expect(SHIRT_SIZES).toContain(s);
 
-    // Registration: PAID → paid; "At Event (Cash)" → cash, not yet collected
+    // Payment types resolve to the collected flag: PAID → yes; cash → owed
     const paid = valid.find((r) => r.raw["Registration"] === "PAID")!;
-    expect(paid.competitor!.registration).toBe("paid");
     expect(paid.competitor!.paid).toBe(true);
     const cash = valid.find((r) => r.raw["Registration"] === "At Event (Cash)")!;
-    expect(cash.competitor!.registration).toBe("cash");
     expect(cash.competitor!.paid).toBe(false);
 
     // Full names split; day-state starts clean
@@ -81,10 +80,18 @@ describe("csv import (ordering-system export)", () => {
     expect(parseDivision("Mentor Division (55+ Years)")).toBe("mentors");
     expect(parseDivision("Men's Division")).toBe("mens");
     expect(parseDivision("Women's Division")).toBe("womens");
-    expect(parseRegistration("At Event (Cash)")).toBe("cash"); // → paid: false
-    expect(parseRegistration("PAID")).toBe("paid");
-    expect(parseRegistration("Credit Card")).toBe("paid"); // → paid: true
-    expect(parseRegistration("")).toBeNull();
+    // parsePaid speaks yes/no, payment types, and amounts (Lineitem price)
+    expect(parsePaid("yes")).toBe(true);
+    expect(parsePaid("No")).toBe(false);
+    expect(parsePaid("PAID")).toBe(true);
+    expect(parsePaid("Credit Card")).toBe(true);
+    expect(parsePaid("Sponsor")).toBe(true);
+    expect(parsePaid("At Event (Cash)")).toBe(false);
+    expect(parsePaid("40")).toBe(true);
+    expect(parsePaid("$75.00")).toBe(true);
+    expect(parsePaid("0")).toBe(false);
+    expect(parsePaid("")).toBeNull();
+    expect(parsePaid("maybe")).toBeNull();
   });
 
   it("duplicate and unnamed headers stay individually mappable", () => {
@@ -128,47 +135,48 @@ describe("csv import (ordering-system export)", () => {
     ]);
   });
 
-  it("payment collection status follows registration type", () => {
+  it("the ordering system's real export headers auto-map completely", () => {
+    // Exactly the header set from the live orders.csv export
     const g = gridFromMatrix([
-      ["Bib", "Name", "Division", "Registration"],
-      ["1", "Online Payer", "Men's Division", "PAID"],
-      ["2", "Card Payer", "Men's Division", "Credit Card"],
-      ["3", "Cash At Desk", "Men's Division", "At Event (Cash)"],
-      ["4", "Comped", "Men's Division", "Sponsor"],
-      ["5", "No Info", "Men's Division", ""],
+      [
+        "Bib", "Product Form: Competitor Name", "Product Form: Select Your Division",
+        "Product Form: Nickname", "Product Form: Hometown", "Email",
+        "Product Form: Shirt Size / Stocking Cap", "Lineitem price",
+      ],
+      ["2", "Elliot Lewis", "Men's Division", "Craig", "Milwaukee, WI", "e@example.com", "Shirt - Large", "40"],
+      ["3", "Marvin Ingram", "Women's Division", "", "West bend wi", "", "Knit Stocking Cap", "0"],
     ]);
-    const rows = buildCompetitors(g.rows, detectMapping(g), []);
-    expect(rows.map((r) => [r.competitor!.registration, r.competitor!.paid])).toEqual([
-      ["paid", true],
-      ["paid", true],
-      ["cash", false],
-      ["sponsor", true],
-      ["cash", false],
-    ]);
+    const m = detectMapping(g);
+    expect(m.bib).toBe("Bib");
+    expect(m.fullName).toBe("Product Form: Competitor Name");
+    expect(m.division).toBe("Product Form: Select Your Division");
+    expect(m.nickname).toBe("Product Form: Nickname");
+    expect(m.hometown).toBe("Product Form: Hometown");
+    expect(m.email).toBe("Email");
+    expect(m.shirtSize).toBe("Product Form: Shirt Size / Stocking Cap");
+    expect(m.paid).toBe("Lineitem price");
+    const rows = buildCompetitors(g.rows, m, []);
+    expect(rows[0].competitor).toMatchObject({ firstName: "Elliot", divisionId: "mens", shirtSize: "L", paid: true });
+    expect(rows[1].competitor).toMatchObject({ divisionId: "womens", shirtSize: "Hat", paid: false });
   });
 
-  it("the downloadable template auto-detects completely, Paid ≠ Registration", () => {
+  it("the downloadable template auto-detects completely", () => {
     const g = gridFromMatrix([
       [
         "Bib", "First Name", "Last Name", "Division (mens/womens/mentors)", "Nickname",
-        "Hometown", "Email", "Shirt Size", "Registration (paid/cash/sponsor)", "Paid (yes/no)",
+        "Hometown", "Email", "Shirt Size", "Paid (yes/no)",
       ],
-      ["1", "Paul", "Bunyan", "mens", "The Axe", "Brainerd, MN", "paul@example.com", "XL", "cash", "no"],
-      ["2", "Babe", "Blue", "womens", "", "", "", "M", "cash", "yes"], // paid override: cash but collected
-      ["3", "Card", "Payer", "mens", "", "", "", "", "credit card", ""], // blank Paid → derived true
+      ["1", "Paul", "Bunyan", "mens", "The Axe", "Brainerd, MN", "paul@example.com", "XL", "no"],
+      ["2", "Babe", "Blue", "womens", "", "", "", "M", "yes"],
+      ["3", "Card", "Payer", "mens", "", "", "", "", ""], // blank Paid → owed
     ]);
     const m = detectMapping(g);
-    expect(m.registration).toBe("Registration (paid/cash/sponsor)");
-    expect(m.paid).toBe("Paid (yes/no)"); // must NOT be swallowed by registration
+    expect(m.paid).toBe("Paid (yes/no)");
     expect(m.firstName).toBe("First Name");
     expect(m.division).toBe("Division (mens/womens/mentors)");
     expect(m.shirtSize).toBe("Shirt Size");
     const rows = buildCompetitors(g.rows, m, []);
-    expect(rows.map((r) => [r.competitor!.registration, r.competitor!.paid])).toEqual([
-      ["cash", false],
-      ["cash", true],
-      ["paid", true],
-    ]);
+    expect(rows.map((r) => r.competitor!.paid)).toEqual([false, true, false]);
   });
 
   it("a column NAMED Registration holding division values maps to Division", () => {
@@ -181,8 +189,7 @@ describe("csv import (ordering-system export)", () => {
       ["101", "Willa Birch", "Women's Division Registration", "No"],
     ]);
     const m = detectMapping(g);
-    expect(m.division).toBe("Registration");
-    expect(m.registration).toBeUndefined(); // not claimed by a division column
+    expect(m.division).toBe("Registration"); // claimed by its VALUES
     const rows = buildCompetitors(g.rows, { ...m, paid: "Lineitem variant" }, []);
     expect(rows.map((r) => [r.competitor!.divisionId, r.competitor!.paid])).toEqual([
       ["mens", true],
