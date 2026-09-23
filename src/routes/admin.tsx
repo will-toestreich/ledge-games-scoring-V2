@@ -189,11 +189,14 @@ function FilterPill({
   active,
   onClick,
   activeColor,
+  count,
   children,
 }: {
   active: boolean;
   onClick: () => void;
   activeColor?: string;
+  /** Faceted count: how many rows this pill would show, given the other filters. */
+  count?: number;
   children: React.ReactNode;
 }) {
   return (
@@ -209,6 +212,7 @@ function FilterPill({
       style={active && activeColor ? { backgroundColor: activeColor } : undefined}
     >
       {children}
+      {count !== undefined && <span className="opacity-60 font-normal"> ({count})</span>}
     </button>
   );
 }
@@ -324,13 +328,27 @@ function CompetitorsTab() {
     setSort((prev) => (prev.key === key ? { key, dir: prev.dir === 1 ? -1 : 1 } : { key, dir: 1 }));
   }
 
-  const filtered = competitors.filter((c) => {
-    if (divisionFilter && c.divisionId !== divisionFilter) return false;
-    if (shirtFilter && c.shirtSize !== shirtFilter) return false;
-    if (paidFilter !== null && c.paid !== paidFilter) return false;
-    if (checkinFilter === "ready" && !c.checkedIn) return false;
-    if (checkinFilter === "pending" && c.checkedIn) return false;
-    if (noShowFilter !== null && c.noShow !== noShowFilter) return false;
+  interface Facets {
+    division: string | null;
+    shirt: string | null;
+    paid: boolean | null;
+    checkin: string | null;
+    noShow: boolean | null;
+  }
+  const active: Facets = {
+    division: divisionFilter,
+    shirt: shirtFilter,
+    paid: paidFilter,
+    checkin: checkinFilter,
+    noShow: noShowFilter,
+  };
+  const passes = (c: Competitor, f: Facets): boolean => {
+    if (f.division && c.divisionId !== f.division) return false;
+    if (f.shirt && c.shirtSize !== f.shirt) return false;
+    if (f.paid !== null && c.paid !== f.paid) return false;
+    if (f.checkin === "ready" && !c.checkedIn) return false;
+    if (f.checkin === "pending" && c.checkedIn) return false;
+    if (f.noShow !== null && c.noShow !== f.noShow) return false;
     if (search) {
       const q = search.toLowerCase();
       return (
@@ -341,7 +359,12 @@ function CompetitorsTab() {
       );
     }
     return true;
-  });
+  };
+  const filtered = competitors.filter((c) => passes(c, active));
+  // Faceted counts: what each pill WOULD show if clicked — its own value
+  // applied, every other active filter and the search kept
+  const countFor = <K extends keyof Facets>(dim: K, value: Facets[K]): number =>
+    competitors.filter((c) => passes(c, { ...active, [dim]: value })).length;
 
   const sorted = [...filtered].sort((a, b) => {
     const va = sortValue[sort.key](a);
@@ -466,13 +489,14 @@ function CompetitorsTab() {
       <div className="flex items-center gap-4 flex-wrap">
         <div className="flex items-center gap-1.5 flex-wrap">
           <span className="text-[10px] text-text-tertiary uppercase tracking-wider font-medium mr-1">Division</span>
-          <FilterPill active={!divisionFilter} onClick={() => setDivisionFilter(null)}>All</FilterPill>
+          <FilterPill active={!divisionFilter} onClick={() => setDivisionFilter(null)} count={countFor("division", null)}>All</FilterPill>
           {divisions.map((div) => (
             <FilterPill
               key={div.id}
               active={divisionFilter === div.id}
               onClick={() => setDivisionFilter(divisionFilter === div.id ? null : div.id)}
               activeColor={div.color}
+              count={countFor("division", div.id)}
             >
               {div.name}
             </FilterPill>
@@ -481,9 +505,14 @@ function CompetitorsTab() {
         <div className="w-px h-5 bg-border-subtle" />
         <div className="flex items-center gap-1.5 flex-wrap">
           <span className="text-[10px] text-text-tertiary uppercase tracking-wider font-medium mr-1">Shirt</span>
-          <FilterPill active={!shirtFilter} onClick={() => setShirtFilter(null)}>All</FilterPill>
+          <FilterPill active={!shirtFilter} onClick={() => setShirtFilter(null)} count={countFor("shirt", null)}>All</FilterPill>
           {SHIRT_SIZES.map((size) => (
-            <FilterPill key={size} active={shirtFilter === size} onClick={() => setShirtFilter(shirtFilter === size ? null : size)}>
+            <FilterPill
+              key={size}
+              active={shirtFilter === size}
+              onClick={() => setShirtFilter(shirtFilter === size ? null : size)}
+              count={countFor("shirt", size)}
+            >
               {size}
             </FilterPill>
           ))}
@@ -491,23 +520,23 @@ function CompetitorsTab() {
         <div className="w-px h-5 bg-border-subtle" />
         <div className="flex items-center gap-1.5 flex-wrap">
           <span className="text-[10px] text-text-tertiary uppercase tracking-wider font-medium mr-1">Paid</span>
-          <FilterPill active={paidFilter === null} onClick={() => setPaidFilter(null)}>All</FilterPill>
-          <FilterPill active={paidFilter === true} onClick={() => setPaidFilter(paidFilter === true ? null : true)} activeColor="#059848">Yes</FilterPill>
-          <FilterPill active={paidFilter === false} onClick={() => setPaidFilter(paidFilter === false ? null : false)} activeColor="#ef4444">No</FilterPill>
+          <FilterPill active={paidFilter === null} onClick={() => setPaidFilter(null)} count={countFor("paid", null)}>All</FilterPill>
+          <FilterPill active={paidFilter === true} onClick={() => setPaidFilter(paidFilter === true ? null : true)} activeColor="#059848" count={countFor("paid", true)}>Yes</FilterPill>
+          <FilterPill active={paidFilter === false} onClick={() => setPaidFilter(paidFilter === false ? null : false)} activeColor="#ef4444" count={countFor("paid", false)}>No</FilterPill>
         </div>
         <div className="w-px h-5 bg-border-subtle" />
         <div className="flex items-center gap-1.5 flex-wrap">
           <span className="text-[10px] text-text-tertiary uppercase tracking-wider font-medium mr-1">Check-in</span>
-          <FilterPill active={!checkinFilter} onClick={() => setCheckinFilter(null)}>All</FilterPill>
-          <FilterPill active={checkinFilter === "ready"} onClick={() => setCheckinFilter(checkinFilter === "ready" ? null : "ready")} activeColor="#059848">Yes</FilterPill>
-          <FilterPill active={checkinFilter === "pending"} onClick={() => setCheckinFilter(checkinFilter === "pending" ? null : "pending")}>No</FilterPill>
+          <FilterPill active={!checkinFilter} onClick={() => setCheckinFilter(null)} count={countFor("checkin", null)}>All</FilterPill>
+          <FilterPill active={checkinFilter === "ready"} onClick={() => setCheckinFilter(checkinFilter === "ready" ? null : "ready")} activeColor="#059848" count={countFor("checkin", "ready")}>Yes</FilterPill>
+          <FilterPill active={checkinFilter === "pending"} onClick={() => setCheckinFilter(checkinFilter === "pending" ? null : "pending")} count={countFor("checkin", "pending")}>No</FilterPill>
         </div>
         <div className="w-px h-5 bg-border-subtle" />
         <div className="flex items-center gap-1.5 flex-wrap">
           <span className="text-[10px] text-text-tertiary uppercase tracking-wider font-medium mr-1">No-show</span>
-          <FilterPill active={noShowFilter === null} onClick={() => setNoShowFilter(null)}>All</FilterPill>
-          <FilterPill active={noShowFilter === true} onClick={() => setNoShowFilter(noShowFilter === true ? null : true)} activeColor="#ef4444">Yes</FilterPill>
-          <FilterPill active={noShowFilter === false} onClick={() => setNoShowFilter(noShowFilter === false ? null : false)} activeColor="#059848">No</FilterPill>
+          <FilterPill active={noShowFilter === null} onClick={() => setNoShowFilter(null)} count={countFor("noShow", null)}>All</FilterPill>
+          <FilterPill active={noShowFilter === true} onClick={() => setNoShowFilter(noShowFilter === true ? null : true)} activeColor="#ef4444" count={countFor("noShow", true)}>Yes</FilterPill>
+          <FilterPill active={noShowFilter === false} onClick={() => setNoShowFilter(noShowFilter === false ? null : false)} activeColor="#059848" count={countFor("noShow", false)}>No</FilterPill>
         </div>
       </div>
 
