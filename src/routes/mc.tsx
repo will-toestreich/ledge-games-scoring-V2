@@ -111,7 +111,7 @@ function EventStatusList({
                   Needs {pending.label} ({owed.length})
                 </div>
                 <div className="flex flex-wrap gap-1">
-                  {owed.slice(0, 24).map((c) => (
+                  {owed.map((c) => (
                     <span
                       key={c.id}
                       className="inline-flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded text-white font-medium"
@@ -121,9 +121,6 @@ function EventStatusList({
                       {c.firstName} {c.lastName}
                     </span>
                   ))}
-                  {owed.length > 24 && (
-                    <span className="text-[10px] text-text-tertiary self-center">+{owed.length - 24} more</span>
-                  )}
                 </div>
               </div>
             )}
