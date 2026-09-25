@@ -292,13 +292,11 @@ export function useDivisionScoring(
     };
   }, [ready, divisionId, competitors.data, scores.data, kegAttempts.data, titleTiebreakWinner]);
 
-  // Held snapshot: tracks the live value until frozen, then stops. Identical
-  // references bail out of the setState, so this is free while live.
+  // Snapshot captured AT the moment the pause flips on; deliberately not
+  // keyed on `value` — updating the snapshot while frozen defeats the pause.
   const frozen = Boolean(opts?.freezeWhenScoreboardPaused && settings?.scoreboardPaused);
-  const [held, setHeld] = useState(value);
-  useEffect(() => {
-    if (!frozen) setHeld(value);
-  }, [frozen, value]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const heldAtPause = useMemo(() => value, [frozen]);
 
-  return { data: frozen ? (held ?? value) : value, isLoading: !ready };
+  return { data: frozen ? (heldAtPause ?? value) : value, isLoading: !ready };
 }
