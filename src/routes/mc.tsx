@@ -9,8 +9,71 @@ import { CheckCircle2, Clock, Mic, Minus, Search, TrendingDown, TrendingUp } fro
 import { EventIcon } from "@/components/event-icons";
 import { divisionEvents } from "@/data/competition-config";
 import { useActiveCompetition, useActiveDivisions, useDivisionScoring, useSettings } from "@/data/hooks";
-import { eventProgress, pendingScorers, type EventResults } from "@/lib/scoring";
+import { eventProgress, pendingScorers, type EventResults, type Standing } from "@/lib/scoring";
 import type { Competitor, Division, DivisionId, EventId } from "@/lib/types";
+
+interface DivisionScoringData {
+  division: Division;
+  field: Competitor[];
+  standings: Standing[];
+  eventResults: Map<EventId, EventResults>;
+}
+
+/** One announcer card's worth of a competitor, division attached. */
+function buildRows(division: Division, data: DivisionScoringData, isLiveSeason: boolean) {
+  const events = divisionEvents(division.id);
+  const anyStarted = [...data.eventResults.values()].some((r) => r.started);
+  // Shared ranks announce as "T-3rd"
+  const rankCounts = new Map<number, number>();
+  for (const s of data.standings) rankCounts.set(s.rank, (rankCounts.get(s.rank) ?? 0) + 1);
+  const byId = new Map(data.field.map((c) => [c.id, c]));
+
+  // Where each competitor owes a score RIGHT NOW ("Axe Throw Rd 2") — the
+  // MC can call people to their lanes. Live seasons only: an archived
+  // season's gaps are history, not a summons.
+  const owes = new Map<string, string[]>();
+  if (isLiveSeason) {
+    for (const e of events) {
+      const res = data.eventResults.get(e.id);
+      const p = res ? pendingScorers(res) : null;
+      if (!p) continue;
+      for (const id of p.competitorIds) {
+        owes.set(id, [...(owes.get(id) ?? []), `${e.name} ${p.label}`]);
+      }
+    }
+  }
+
+  return data.standings.map((s) => {
+    const c = byId.get(s.competitorId)!;
+    const hints: string[] = [];
+    if (anyStarted && s.rank === 1) {
+      hints.push(s.tiebreakRequired ? "tied for the division lead — arrow-off pending" : "division leader");
+    }
+    const leading = events
+      .filter((e) => {
+        const res = data.eventResults.get(e.id);
+        const r = res?.started ? res.byCompetitor.get(c.id) : undefined;
+        return r?.rank === 1 && r.participated;
+      })
+      .map((e) => e.name);
+    if (leading.length > 0) hints.push(`leading ${leading.join(" & ")}`);
+    const keg = data.eventResults.get("keg");
+    const kegRes = keg?.started ? keg.byCompetitor.get(c.id) : undefined;
+    if (kegRes?.participated && kegRes.cumulative > 0) {
+      hints.push(`cleared ${kegRes.cumulative} ft in Keg Toss`);
+    }
+    return {
+      c,
+      s,
+      division,
+      anyStarted,
+      tie: (rankCounts.get(s.rank) ?? 0) > 1,
+      hints: hints.slice(0, 2),
+      needs: owes.get(c.id) ?? [],
+      nickname: c.nickname?.replace(/^"+|"+$/g, "").trim() || null,
+    };
+  });
+}
 
 function ordinal(n: number): string {
   const s = ["th", "st", "nd", "rd"];
@@ -136,67 +199,28 @@ export function AnnouncerPage() {
   const { data: activeComp } = useActiveCompetition();
   const isLiveSeason = activeComp?.status === "active";
   const activeDivisions = useActiveDivisions();
-  const [divisionId, setDivisionId] = useState<DivisionId>("mens");
-  const division = activeDivisions.find((d) => d.id === divisionId) ?? activeDivisions[0];
+  const [view, setView] = useState<"all" | DivisionId>("all");
   const [mode, setMode] = useState<"competitors" | "events">("competitors");
   const [sort, setSort] = useState<"entry" | "standings">("entry");
   const [search, setSearch] = useState("");
-  const { data } = useDivisionScoring(division.id);
+  const scoring = {
+    mens: useDivisionScoring("mens"),
+    womens: useDivisionScoring("womens"),
+    mentors: useDivisionScoring("mentors"),
+  };
+  const shownDivisions =
+    view === "all" ? activeDivisions : activeDivisions.filter((d) => d.id === view);
+  const anyDataLoaded = shownDivisions.some((d) => scoring[d.id].data);
 
-  const rows = useMemo(() => {
-    if (!data) return [];
-    const events = divisionEvents(division.id);
-    const anyStarted = [...data.eventResults.values()].some((r) => r.started);
-    // Shared ranks announce as "T-3rd"
-    const rankCounts = new Map<number, number>();
-    for (const s of data.standings) rankCounts.set(s.rank, (rankCounts.get(s.rank) ?? 0) + 1);
-    const byId = new Map(data.field.map((c) => [c.id, c]));
-
-    // Where each competitor owes a score RIGHT NOW ("Axe Throw Rd 2") — the
-    // MC can call people to their lanes. Live seasons only: an archived
-    // season's gaps are history, not a summons.
-    const owes = new Map<string, string[]>();
-    if (isLiveSeason) {
-      for (const e of events) {
-        const res = data.eventResults.get(e.id);
-        const p = res ? pendingScorers(res) : null;
-        if (!p) continue;
-        for (const id of p.competitorIds) {
-          owes.set(id, [...(owes.get(id) ?? []), `${e.name} ${p.label}`]);
-        }
-      }
-    }
-
-    return data.standings.map((s) => {
-      const c = byId.get(s.competitorId)!;
-      const hints: string[] = [];
-      if (anyStarted && s.rank === 1) {
-        hints.push(s.tiebreakRequired ? "tied for the division lead — arrow-off pending" : "division leader");
-      }
-      const leading = events
-        .filter((e) => {
-          const res = data.eventResults.get(e.id);
-          const r = res?.started ? res.byCompetitor.get(c.id) : undefined;
-          return r?.rank === 1 && r.participated;
-        })
-        .map((e) => e.name);
-      if (leading.length > 0) hints.push(`leading ${leading.join(" & ")}`);
-      const keg = data.eventResults.get("keg");
-      const kegRes = keg?.started ? keg.byCompetitor.get(c.id) : undefined;
-      if (kegRes?.participated && kegRes.cumulative > 0) {
-        hints.push(`cleared ${kegRes.cumulative} ft in Keg Toss`);
-      }
-      return {
-        c,
-        s,
-        anyStarted,
-        tie: (rankCounts.get(s.rank) ?? 0) > 1,
-        hints: hints.slice(0, 2),
-        needs: owes.get(c.id) ?? [],
-        nickname: c.nickname?.replace(/^"+|"+$/g, "").trim() || null,
-      };
-    });
-  }, [data, division.id, isLiveSeason]);
+  const rows = useMemo(
+    () =>
+      shownDivisions.flatMap((d) => {
+        const data = scoring[d.id].data;
+        return data ? buildRows(d, data, isLiveSeason) : [];
+      }),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [view, activeDivisions, scoring.mens.data, scoring.womens.data, scoring.mentors.data, isLiveSeason]
+  );
 
   const q = search.trim().toLowerCase();
   const shown = rows
@@ -220,14 +244,24 @@ export function AnnouncerPage() {
         </p>
       </div>
 
-      {/* Division pills */}
-      <div className="flex gap-2 mb-4">
+      {/* Division pills — All (merged, the default) or one division */}
+      <div className="flex gap-2 mb-4 flex-wrap">
+        <button
+          onClick={() => setView("all")}
+          className={`px-4 py-2 text-sm font-medium rounded-lg transition-all duration-200 ${
+            view === "all"
+              ? "bg-surface-overlay text-text-primary border border-border-default"
+              : "text-text-secondary bg-surface-raised border border-border-subtle hover:border-border-default"
+          }`}
+        >
+          All
+        </button>
         {activeDivisions.map((div) => {
-          const isActive = division.id === div.id;
+          const isActive = view === div.id;
           return (
             <button
               key={div.id}
-              onClick={() => setDivisionId(div.id)}
+              onClick={() => setView(div.id)}
               className={`px-4 py-2 text-sm font-medium rounded-lg transition-all duration-200 ${
                 isActive
                   ? "text-white"
@@ -295,27 +329,43 @@ export function AnnouncerPage() {
         )}
       </div>
 
-      {/* Event status mode */}
-      {mode === "events" && data && (
-        <EventStatusList
-          division={division}
-          field={data.field}
-          eventResults={data.eventResults}
-          live={isLiveSeason}
-        />
+      {/* Event status mode — per-division sections when viewing All */}
+      {mode === "events" && anyDataLoaded && (
+        <div className="space-y-6">
+          {shownDivisions.map((div) => {
+            const data = scoring[div.id].data;
+            if (!data) return null;
+            return (
+              <div key={div.id}>
+                {view === "all" && (
+                  <div className="flex items-center gap-2 mb-2">
+                    <span className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: div.color }} />
+                    <h2 className="font-bold text-text-primary text-sm">{div.name}</h2>
+                  </div>
+                )}
+                <EventStatusList
+                  division={div}
+                  field={data.field}
+                  eventResults={data.eventResults}
+                  live={isLiveSeason}
+                />
+              </div>
+            );
+          })}
+        </div>
       )}
-      {mode === "events" && !data && <p className="text-text-tertiary text-sm">Loading…</p>}
+      {mode === "events" && !anyDataLoaded && <p className="text-text-tertiary text-sm">Loading…</p>}
 
       {/* The list */}
-      {mode === "events" ? null : !data ? (
+      {mode === "events" ? null : !anyDataLoaded ? (
         <p className="text-text-tertiary text-sm">Loading…</p>
       ) : shown.length === 0 ? (
         <p className="text-text-tertiary text-sm">
-          {rows.length === 0 ? "No competitors in this division yet." : `Nobody matches “${search.trim()}”.`}
+          {rows.length === 0 ? "No competitors yet." : `Nobody matches “${search.trim()}”.`}
         </p>
       ) : (
         <div className="space-y-2">
-          {shown.map(({ c, s, anyStarted, tie, hints, needs, nickname }) => (
+          {shown.map(({ c, s, division, anyStarted, tie, hints, needs, nickname }) => (
             <div key={c.id} className="card rounded-xl px-4 py-3 flex items-center gap-3">
               <span className="bib-badge text-sm shrink-0" style={{ backgroundColor: division.color }}>
                 {c.bibNumber}
