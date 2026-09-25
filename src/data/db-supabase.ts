@@ -56,6 +56,8 @@ interface CompetitionRow {
   year: number;
   scorer_pin: string;
   mentors_enabled: boolean;
+  /** Added by migration 002 — optional so pre-migration rows still map. */
+  scoreboard_paused?: boolean;
   title_tiebreak_winners: Partial<Record<DivisionId, string>> | null;
 }
 
@@ -65,6 +67,7 @@ function rowToSettings(r: CompetitionRow): Settings {
     year: r.year,
     scorerPin: r.scorer_pin,
     mentorsEnabled: r.mentors_enabled,
+    scoreboardPaused: Boolean(r.scoreboard_paused),
     titleTiebreakWinners: r.title_tiebreak_winners ?? {},
   };
 }
@@ -617,6 +620,8 @@ export async function saveSettings(patch: Partial<Settings>): Promise<void> {
   if (patch.year !== undefined) row.year = patch.year;
   if (patch.scorerPin !== undefined) row.scorer_pin = patch.scorerPin;
   if (patch.mentorsEnabled !== undefined) row.mentors_enabled = patch.mentorsEnabled;
+  // Requires migration 002 (the write fails loudly if it hasn't been run)
+  if (patch.scoreboardPaused !== undefined) row.scoreboard_paused = patch.scoreboardPaused;
   if (patch.titleTiebreakWinners !== undefined) row.title_tiebreak_winners = patch.titleTiebreakWinners;
   fail((await sb().from("v2_competitions").update(row).eq("id", id)).error);
   emitUpdated();

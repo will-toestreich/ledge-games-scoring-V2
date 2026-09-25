@@ -254,8 +254,15 @@ export function useActiveDivisions(): Division[] {
 /**
  * Live standings + per-event results for one division, recomputed whenever
  * the underlying data changes. Everything every view shows comes from here.
+ *
+ * `freezeWhenScoreboardPaused` (scoreboard views only): while the director
+ * has the scoreboard paused, keep returning the data from the moment of the
+ * pause — resuming snaps straight to current. Admin views never pass it.
  */
-export function useDivisionScoring(divisionId: DivisionId) {
+export function useDivisionScoring(
+  divisionId: DivisionId,
+  opts?: { freezeWhenScoreboardPaused?: boolean }
+) {
   const competitors = useCompetitors();
   const scores = useScores();
   const kegAttempts = useKegAttempts();
@@ -285,5 +292,13 @@ export function useDivisionScoring(divisionId: DivisionId) {
     };
   }, [ready, divisionId, competitors.data, scores.data, kegAttempts.data, titleTiebreakWinner]);
 
-  return { data: value, isLoading: !ready };
+  // Held snapshot: tracks the live value until frozen, then stops. Identical
+  // references bail out of the setState, so this is free while live.
+  const frozen = Boolean(opts?.freezeWhenScoreboardPaused && settings?.scoreboardPaused);
+  const [held, setHeld] = useState(value);
+  useEffect(() => {
+    if (!frozen) setHeld(value);
+  }, [frozen, value]);
+
+  return { data: frozen ? (held ?? value) : value, isLoading: !ready };
 }

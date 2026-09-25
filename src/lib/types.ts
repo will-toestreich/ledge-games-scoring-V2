@@ -119,6 +119,12 @@ export interface Settings {
   /** Mentors division runs only in years with enough sign-ups. */
   mentorsEnabled: boolean;
   /**
+   * Freeze the public scoreboard: every scoreboard view holds its last data
+   * and the LIVE badge reads PAUSED, until resumed from Mission Control.
+   * Admin/scorer views are unaffected.
+   */
+  scoreboardPaused?: boolean;
+  /**
    * Arrow-off results: when a division title ends tied, the field-resolved
    * winner (1 arrow, closest to bullseye) is recorded here by competitor id.
    */

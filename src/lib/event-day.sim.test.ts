@@ -315,6 +315,11 @@ describe("mock event day (full simulation through the real adapter)", () => {
 
     await db.saveSettings({ scorerPin: "4242" });
     expect((await db.fetchSettings()).scorerPin).toBe("4242");
+    // Scoreboard pause round-trips through settings
+    await db.saveSettings({ scoreboardPaused: true });
+    expect((await db.fetchSettings()).scoreboardPaused).toBe(true);
+    await db.saveSettings({ scoreboardPaused: false });
+    expect((await db.fetchSettings()).scoreboardPaused).toBe(false);
 
     const final = await db.fetchCompetitors();
     mensField = divisionField("mens", final).length;

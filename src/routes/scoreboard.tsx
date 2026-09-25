@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Link } from "@tanstack/react-router";
-import { Shield, Crosshair, Mic, Sun, Moon, Swords } from "lucide-react";
+import { Shield, Crosshair, Mic, Pause, Sun, Moon, Swords } from "lucide-react";
 import { useTheme } from "@/lib/theme";
 import { EventIcon } from "@/components/event-icons";
 import { BrandLogo } from "@/components/brand-logo";
@@ -95,7 +95,20 @@ export function ScoreboardPage() {
           </Link>
           <ScoreboardThemeToggle />
           <div className="h-3 w-px bg-border-subtle" />
-          {isLive ? (
+          {!isLive ? (
+            // Archived seasons must never masquerade as a live competition
+            <span className="font-medium text-amber-400 uppercase tracking-wider" style={{ fontSize: "clamp(8px, 0.5vw, 10px)" }}>
+              Final — archived season
+            </span>
+          ) : settings?.scoreboardPaused ? (
+            // The director froze the board — updates resume from Settings
+            <div className="flex items-center gap-1.5">
+              <Pause size={10} className="text-amber-400" fill="currentColor" />
+              <span className="font-medium text-amber-400 uppercase tracking-wider" style={{ fontSize: "clamp(8px, 0.5vw, 10px)" }}>
+                Paused
+              </span>
+            </div>
+          ) : (
             <div className="flex items-center gap-1.5">
               <span className="relative flex h-2 w-2">
                 <span className="absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75 animate-ping" />
@@ -103,11 +116,6 @@ export function ScoreboardPage() {
               </span>
               <span className="font-medium text-emerald-400 uppercase tracking-wider" style={{ fontSize: "clamp(8px, 0.5vw, 10px)" }}>Live</span>
             </div>
-          ) : (
-            // Archived seasons must never masquerade as a live competition
-            <span className="font-medium text-amber-400 uppercase tracking-wider" style={{ fontSize: "clamp(8px, 0.5vw, 10px)" }}>
-              Final — archived season
-            </span>
           )}
         </div>
       </div>
@@ -272,9 +280,9 @@ function OverviewDashboard({ compact }: { compact: boolean }) {
 
 function EventStrip({ compact = false }: { compact?: boolean }) {
   const scoring = {
-    mens: useDivisionScoring("mens"),
-    womens: useDivisionScoring("womens"),
-    mentors: useDivisionScoring("mentors"),
+    mens: useDivisionScoring("mens", { freezeWhenScoreboardPaused: true }),
+    womens: useDivisionScoring("womens", { freezeWhenScoreboardPaused: true }),
+    mentors: useDivisionScoring("mentors", { freezeWhenScoreboardPaused: true }),
   };
   const activeDivisions = useActiveDivisions();
   // Projections are for LIVE competitions — an archived season's unlocked
@@ -482,7 +490,7 @@ function DivisionLeaderboard({
 }) {
   const scrollRef = useAutoScroll(0.3, 4000);
   const scrollRefB = useAutoScroll(0.3, 4000);
-  const { data } = useDivisionScoring(div.id);
+  const { data } = useDivisionScoring(div.id, { freezeWhenScoreboardPaused: true });
 
   // Measure the rows viewport so row height scales to exactly fill it
   const [rowsAreaH, setRowsAreaH] = useState(0);
@@ -620,7 +628,7 @@ function Metric({ label, value, accent }: { label: string; value: string; accent
 }
 
 function DivisionDetail({ divisionId }: { divisionId: DivisionId }) {
-  const { data } = useDivisionScoring(divisionId);
+  const { data } = useDivisionScoring(divisionId, { freezeWhenScoreboardPaused: true });
   const { data: activeComp } = useActiveCompetition();
   const isLive = activeComp?.status === "active";
   if (!data) return null;

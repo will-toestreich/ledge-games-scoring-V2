@@ -32,6 +32,8 @@ import {
   Flag,
   Scissors,
   Eraser,
+  Pause,
+  Play,
 } from "lucide-react";
 import { useRef } from "react";
 import { EventIcon } from "@/components/event-icons";
@@ -1344,6 +1346,57 @@ function SettingsTab() {
           className="input w-48 font-mono text-xl tracking-[0.3em] text-center"
         />
       </SettingsField>
+
+      {/* Scoreboard status: freeze the public board (finals suspense, or a
+          correction you don't want flashing on the TV). Scoring continues;
+          resuming snaps every screen straight to current. */}
+      <div className="card rounded-xl p-6">
+        <div className="flex items-center justify-between gap-4">
+          <div>
+            <h3 className="font-semibold text-text-primary flex items-center gap-2">
+              <Radar size={16} className="text-text-tertiary" />
+              Scoreboard Status
+              {settings.scoreboardPaused ? (
+                <span className="badge badge-warning inline-flex items-center gap-1">
+                  <Pause size={10} fill="currentColor" /> paused
+                </span>
+              ) : (
+                <span className="badge badge-success">live</span>
+              )}
+            </h3>
+            <p className="text-sm text-text-secondary mt-0.5">
+              {settings.scoreboardPaused
+                ? "The public scoreboard is FROZEN on every screen. Scoring continues — resuming catches everything up instantly."
+                : "The public scoreboard updates live. Pause it to freeze every screen (finals suspense, or corrections in progress)."}
+            </p>
+          </div>
+          <button
+            onClick={() => saveSettings.mutate({ scoreboardPaused: !settings.scoreboardPaused })}
+            disabled={saveSettings.isPending}
+            className={`text-xs font-medium px-4 py-2 rounded-lg shrink-0 transition-all inline-flex items-center gap-1.5 ${
+              settings.scoreboardPaused
+                ? "bg-emerald-500 text-white"
+                : "bg-amber-500/15 text-amber-400 border border-amber-500/30 hover:bg-amber-500/25"
+            }`}
+          >
+            {settings.scoreboardPaused ? (
+              <>
+                <Play size={13} fill="currentColor" /> Resume scoreboard
+              </>
+            ) : (
+              <>
+                <Pause size={13} fill="currentColor" /> Pause scoreboard
+              </>
+            )}
+          </button>
+        </div>
+        {saveSettings.isError && (
+          <p className="text-xs text-red-400 mt-2">
+            Couldn't save: {String(saveSettings.error)}. If this mentions a missing column, run
+            supabase/migrations/002_scoreboard_pause.sql in the Supabase SQL Editor.
+          </p>
+        )}
+      </div>
 
       <SettingsSection label="Events" icon={<Calendar size={16} />} count={events.length}>
         <div className="space-y-2 mt-3">
