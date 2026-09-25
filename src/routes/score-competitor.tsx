@@ -2,7 +2,7 @@ import { useMemo, useState } from "react";
 import { Link, useNavigate, useParams, useSearch } from "@tanstack/react-router";
 import { ChevronLeft, Check, Delete, Ban } from "lucide-react";
 import { divisions, getEvent, roundLabel } from "@/data/competition-config";
-import type { AttemptScore, EventConfig, RoundPlan } from "@/lib/types";
+import type { AttemptScore, Competitor, EventConfig, RoundPlan } from "@/lib/types";
 import {
   useCompetitors,
   useDeleteRoundAttempts,
@@ -14,7 +14,10 @@ import { ScorerGate } from "./score";
 
 export function ScoreCompetitorPage() {
   const { eventId, competitorId } = useParams({ from: "/score/$eventId/$competitorId" });
-  const search = useSearch({ from: "/score/$eventId/$competitorId" }) as { round?: number };
+  const search = useSearch({ from: "/score/$eventId/$competitorId" }) as {
+    round?: number;
+    division?: "all" | Competitor["divisionId"];
+  };
   const event = getEvent(eventId);
   const { data: competitors } = useCompetitors();
   const { data: scores } = useScores();
@@ -47,6 +50,7 @@ export function ScoreCompetitorPage() {
         event={event}
         competitorId={competitor.id}
         round={round}
+        backView={search.division ?? competitor.divisionId}
       />
     </ScorerGate>
   );
@@ -56,10 +60,13 @@ function ScoreEntry({
   event,
   competitorId,
   round,
+  backView,
 }: {
   event: EventConfig;
   competitorId: string;
   round: number;
+  /** The queue view to return to: "all" (merged) or a division id. */
+  backView: "all" | Competitor["divisionId"];
 }) {
   const navigate = useNavigate();
   const { data: competitors } = useCompetitors();
@@ -154,14 +161,14 @@ function ScoreEntry({
     save.mutate({ attempts, removeIds }, {
       onSuccess: () => {
         setSubmitted(true);
-        // Return to the queue of THIS competitor's division — a scorer
-        // working the women's line lands back on the women's list
+        // Return to the view the scorer came from — the merged "all" queue
+        // or this competitor's division list
         setTimeout(
           () =>
             navigate({
               to: "/score/$eventId",
               params: { eventId: event.id },
-              search: { division: competitor.divisionId },
+              search: { division: backView },
             }),
           700
         );
@@ -176,7 +183,7 @@ function ScoreEntry({
       <Link
         to="/score/$eventId"
         params={{ eventId: event.id }}
-        search={{ division: competitor.divisionId }}
+        search={{ division: backView }}
         className="btn-ghost text-sm text-text-tertiary mb-4 -ml-3 inline-flex items-center gap-1 hover:text-text-primary"
       >
         <ChevronLeft size={16} />
@@ -354,7 +361,7 @@ function ScoreEntry({
                           navigate({
                             to: "/score/$eventId",
                             params: { eventId: event.id },
-                            search: { division: competitor.divisionId },
+                            search: { division: backView },
                           }),
                       }
                     )

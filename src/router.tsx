@@ -212,10 +212,11 @@ const scoreEventRoute = createRoute({
   path: "/score/$eventId",
   component: ScoreEventPage,
   // Division lives in the URL so saving a score returns the scorer to the
-  // division they were working, and refresh/back keep it
-  validateSearch: (search: Record<string, unknown>): { division?: "mens" | "womens" | "mentors" } => {
+  // view they were working ("all" is the merged queue and the default), and
+  // refresh/back keep it
+  validateSearch: (search: Record<string, unknown>): { division?: "all" | "mens" | "womens" | "mentors" } => {
     const d = search.division;
-    return d === "mens" || d === "womens" || d === "mentors" ? { division: d } : {};
+    return d === "all" || d === "mens" || d === "womens" || d === "mentors" ? { division: d } : {};
   },
 });
 
@@ -223,9 +224,16 @@ const scoreCompetitorRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/score/$eventId/$competitorId",
   component: ScoreCompetitorPage,
-  validateSearch: (search: Record<string, unknown>): { round?: number } => {
+  validateSearch: (
+    search: Record<string, unknown>
+  ): { round?: number; division?: "all" | "mens" | "womens" | "mentors" } => {
     const round = Number(search.round);
-    return Number.isInteger(round) && round >= 1 ? { round } : {};
+    const d = search.division;
+    return {
+      ...(Number.isInteger(round) && round >= 1 ? { round } : {}),
+      // The view to return to after saving (the merged "all" queue or one division)
+      ...(d === "all" || d === "mens" || d === "womens" || d === "mentors" ? { division: d } : {}),
+    };
   },
 });
 

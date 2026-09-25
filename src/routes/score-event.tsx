@@ -3,7 +3,7 @@ import { Link, useNavigate, useSearch } from "@tanstack/react-router";
 import { ChevronLeft, ChevronUp, ChevronDown, Undo2, Check, X, FastForward, Scissors } from "lucide-react";
 import { useParams } from "@tanstack/react-router";
 import { divisions, getEvent, roundLabel } from "@/data/competition-config";
-import type { Competitor, DivisionId, EventConfig, KegAttempt } from "@/lib/types";
+import type { AttemptScore, Competitor, Division, DivisionId, EventConfig, KegAttempt } from "@/lib/types";
 import {
   computeEventResults,
   divisionField,
@@ -43,21 +43,23 @@ function EventScoring({ event }: { event: EventConfig }) {
   const { data: activeComp } = useActiveCompetition();
   const activeDivisions = useActiveDivisions();
   const eventDivisions = activeDivisions.filter((d) => event.divisions[d.id]);
-  // Division comes from the URL (single source of truth): saving a score
-  // navigates back with the competitor's division, so a scorer working the
-  // women's line lands back on the women's queue. Falls back to the first
-  // division when absent or inactive (mentors toggled off mid-event).
-  const search = useSearch({ from: "/score/$eventId" }) as { division?: DivisionId };
+  // View comes from the URL (single source of truth). Default is "all" —
+  // the merged queue across divisions; saving a score returns to whichever
+  // view the scorer was working.
+  const search = useSearch({ from: "/score/$eventId" }) as { division?: DivisionId | "all" };
   const navigate = useNavigate();
-  const division = eventDivisions.find((d) => d.id === search.division) ?? eventDivisions[0];
-  const activeDivisionId = division.id;
-  const setDivisionId = (id: DivisionId) =>
+  const view: "all" | DivisionId =
+    search.division !== "all" && eventDivisions.some((d) => d.id === search.division)
+      ? (search.division as DivisionId)
+      : "all";
+  const setView = (id: "all" | DivisionId) =>
     navigate({
       to: "/score/$eventId",
       params: { eventId: event.id },
       search: { division: id },
       replace: true,
     });
+  const division = view === "all" ? null : eventDivisions.find((d) => d.id === view)!;
 
   const competitors = useCompetitors();
   const scores = useScores();
@@ -68,16 +70,17 @@ function EventScoring({ event }: { event: EventConfig }) {
   // the engine is cheap at this field size, and the React Compiler couldn't
   // preserve the manual memoization anyway.
   const ready = competitors.data && scores.data && kegAttempts.data;
-  const field = competitors.data ? divisionField(activeDivisionId, competitors.data) : [];
-  const results = ready
-    ? computeEventResults({
-        event,
-        division,
-        field,
-        scores: scores.data!,
-        kegAttempts: kegAttempts.data!,
-      })
-    : null;
+  const field = division && competitors.data ? divisionField(division.id, competitors.data) : [];
+  const results =
+    ready && division
+      ? computeEventResults({
+          event,
+          division,
+          field,
+          scores: scores.data!,
+          kegAttempts: kegAttempts.data!,
+        })
+      : null;
 
   return (
     <div className="max-w-lg mx-auto px-4 py-8 animate-slide-up">
@@ -92,14 +95,24 @@ function EventScoring({ event }: { event: EventConfig }) {
         <h1 className="text-2xl font-bold tracking-tight">{event.name}</h1>
       </div>
 
-      {/* Division pills */}
-      <div className="flex gap-2 mb-6">
+      {/* View pills: the merged queue, or one division's full view */}
+      <div className="flex gap-2 mb-6 flex-wrap">
+        <button
+          onClick={() => setView("all")}
+          className={`px-4 py-2 text-sm font-medium rounded-lg transition-all duration-200 ${
+            view === "all"
+              ? "bg-surface-overlay text-text-primary border border-border-default"
+              : "text-text-secondary bg-surface-raised border border-border-subtle hover:border-border-default"
+          }`}
+        >
+          All
+        </button>
         {eventDivisions.map((div) => {
-          const isActive = activeDivisionId === div.id;
+          const isActive = view === div.id;
           return (
             <button
               key={div.id}
-              onClick={() => setDivisionId(div.id)}
+              onClick={() => setView(div.id)}
               className={`px-4 py-2 text-sm font-medium rounded-lg transition-all duration-200 ${
                 isActive
                   ? "text-white"
@@ -113,16 +126,157 @@ function EventScoring({ event }: { event: EventConfig }) {
         })}
       </div>
 
-      {!results ? (
+      {!ready ? (
         <p className="text-text-tertiary text-sm">Loading…</p>
+      ) : view === "all" ? (
+        event.format === "ladder" ? (
+          // All + ladder: both consoles stacked, each its own bar
+          <div className="space-y-8">
+            {eventDivisions.map((div) => (
+              <div key={div.id}>
+                <div className="flex items-center gap-2 mb-3">
+                  <span className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: div.color }} />
+                  <h2 className="font-bold text-text-primary">{div.name}</h2>
+                </div>
+                <KegConsole
+                  key={`${activeComp?.id}:${div.id}`}
+                  field={divisionField(div.id, competitors.data!)}
+                  attempts={kegAttempts.data!}
+                  event={event}
+                  color={div.color}
+                />
+              </div>
+            ))}
+          </div>
+        ) : (
+          <AllDivisionsQueue
+            event={event}
+            eventDivisions={eventDivisions}
+            competitors={competitors.data!}
+            scores={scores.data!}
+            kegAttempts={kegAttempts.data!}
+          />
+        )
       ) : event.format === "ladder" ? (
         // Keyed by competition AND division: bar height and round state must
         // never leak between divisions or across a season switch
-        <KegConsole key={`${activeComp?.id}:${activeDivisionId}`} field={field} attempts={kegAttempts.data!} event={event} color={division.color} />
+        <KegConsole key={`${activeComp?.id}:${view}`} field={field} attempts={kegAttempts.data!} event={event} color={division!.color} />
       ) : (
-        <RoundsScoring key={`${activeComp?.id}:${activeDivisionId}`} event={event} divisionColor={division.color} field={field} results={results} divisionId={activeDivisionId} />
+        <RoundsScoring key={`${activeComp?.id}:${view}`} event={event} divisionColor={division!.color} field={field} results={results!} divisionId={view} />
       )}
     </div>
+  );
+}
+
+/**
+ * The merged "who's up" queue across every division in this event — the
+ * default view: a scorer serves whoever steps to the line, any division.
+ * Each division is worked at its own current round; partial rounds float
+ * to the top; the per-division full views (round tabs, cut line, scored
+ * list) live behind the division pills.
+ */
+function AllDivisionsQueue({
+  event,
+  eventDivisions,
+  competitors,
+  scores,
+  kegAttempts,
+}: {
+  event: EventConfig;
+  eventDivisions: Division[];
+  competitors: Competitor[];
+  scores: AttemptScore[];
+  kegAttempts: KegAttempt[];
+}) {
+  const sections = eventDivisions.map((division) => {
+    const field = divisionField(division.id, competitors);
+    const res = computeEventResults({ event, division, field, scores, kegAttempts });
+    const plan = event.divisions[division.id]!;
+    const nRounds = plan.rounds.length;
+    let round = nRounds;
+    for (let r = 1; r <= nRounds; r++) {
+      const eligible = res.eligibleByRound[r - 1] ?? [];
+      if (eligible.some((id) => !res.byCompetitor.get(id)!.roundComplete[r - 1])) {
+        round = r;
+        break;
+      }
+    }
+    const byId = new Map(field.map((c) => [c.id, c]));
+    const eligible = res.eligibleByRound[round - 1] ?? [];
+    const pending = eligible
+      .filter((id) => !res.byCompetitor.get(id)!.roundComplete[round - 1])
+      .map((id) => byId.get(id)!)
+      .filter(Boolean);
+    return {
+      division,
+      res,
+      plan,
+      round,
+      pending,
+      doneCount: eligible.length - pending.length,
+      eligibleCount: eligible.length,
+    };
+  });
+
+  const rows = sections
+    .flatMap((s) => s.pending.map((c) => ({ c, s })))
+    .sort((a, b) => {
+      const aStarted = a.s.res.byCompetitor.get(a.c.id)!.roundAttempts[a.s.round - 1] > 0 ? 0 : 1;
+      const bStarted = b.s.res.byCompetitor.get(b.c.id)!.roundAttempts[b.s.round - 1] > 0 ? 0 : 1;
+      return aStarted - bStarted || a.c.bibNumber - b.c.bibNumber;
+    });
+
+  return (
+    <>
+      {/* Per-division state at a glance */}
+      <div className="flex gap-2 mb-6 flex-wrap">
+        {sections.map(({ division, round, plan, doneCount, eligibleCount, pending }) => (
+          <span
+            key={division.id}
+            className="inline-flex items-center gap-1.5 text-[11px] font-medium px-2.5 py-1 rounded-full bg-surface-raised border border-border-subtle text-text-secondary"
+          >
+            <span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: division.color }} />
+            {division.name.replace("'s", "")} · Rd {round}/{plan.rounds.length} ·{" "}
+            <span className={`font-mono ${pending.length === 0 ? "text-emerald-400" : ""}`}>
+              {doneCount}/{eligibleCount}
+            </span>
+          </span>
+        ))}
+      </div>
+
+      {rows.length === 0 ? (
+        <div className="card rounded-xl px-4 py-6 text-center text-sm text-emerald-400">
+          Nobody owes a score in this event right now.
+        </div>
+      ) : (
+        <div>
+          <p className="section-label mb-3">Needs Scoring ({rows.length})</p>
+          <div className="space-y-1.5">
+            {rows.map(({ c, s }) => {
+              const st = s.res.byCompetitor.get(c.id)!;
+              const attempts = st.roundAttempts[s.round - 1];
+              const planned = s.plan.rounds[s.round - 1].attempts;
+              return (
+                <CompetitorRow
+                  key={c.id}
+                  competitor={c}
+                  eventId={event.id}
+                  round={s.round}
+                  divisionColor={s.division.color}
+                  backView="all"
+                  tag={`${s.division.name.replace("'s", "")} · Rd ${s.round}`}
+                  subLabel={
+                    attempts > 0
+                      ? `${st.roundScores[s.round - 1]} ${event.unit} so far · ${attempts}/${planned} in`
+                      : undefined
+                  }
+                />
+              );
+            })}
+          </div>
+        </div>
+      )}
+    </>
   );
 }
 
@@ -263,6 +417,7 @@ function RoundsScoring({
                   eventId={event.id}
                   round={round}
                   divisionColor={divisionColor}
+                  backView={divisionId}
                   subLabel={
                     attempts > 0
                       ? `${st.roundScores[round - 1]} ${event.unit} so far · ${attempts}/${planned} in`
@@ -288,6 +443,7 @@ function RoundsScoring({
                   eventId={event.id}
                   round={round}
                   divisionColor={divisionColor}
+                  backView={divisionId}
                   scoreLabel={`${r.roundScores[round - 1]} ${event.unit}`}
                 />
               );
@@ -317,6 +473,8 @@ function CompetitorRow({
   eventId,
   round,
   divisionColor,
+  backView,
+  tag,
   scoreLabel,
   subLabel,
 }: {
@@ -324,6 +482,10 @@ function CompetitorRow({
   eventId: string;
   round: number;
   divisionColor: string;
+  /** Which queue view saving should return to ("all" or a division id). */
+  backView: "all" | DivisionId;
+  /** Small context tag on the right, e.g. "Men · Rd 2" in the merged queue. */
+  tag?: string;
   scoreLabel?: string;
   /** Partial-round state, e.g. "9 pts so far · 1/2 in". */
   subLabel?: string;
@@ -333,7 +495,7 @@ function CompetitorRow({
     <Link
       to="/score/$eventId/$competitorId"
       params={{ eventId, competitorId: competitor.id }}
-      search={{ round }}
+      search={{ round, division: backView }}
       className={`flex items-center gap-3 px-3 py-3 rounded-xl transition-all duration-150 group ${
         scored
           ? "bg-surface-raised/40 hover:bg-surface-raised"
@@ -347,6 +509,7 @@ function CompetitorRow({
         {competitor.firstName} {competitor.lastName}
         {subLabel && <span className="block text-[11px] font-normal text-amber-400/90">{subLabel}</span>}
       </span>
+      {tag && <span className="text-[10px] text-text-tertiary font-medium shrink-0">{tag}</span>}
       {scored && <span className="text-sm text-text-tertiary font-mono">{scoreLabel}</span>}
       <span className="text-text-tertiary group-hover:text-text-secondary group-hover:translate-x-0.5 transition-all text-sm">
         {scored ? "edit" : "›"}
