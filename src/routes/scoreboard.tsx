@@ -369,6 +369,12 @@ function EventStrip({ compact = false }: { compact?: boolean }) {
 
 // ─── Division leaderboard column ──────────────────────────
 
+// Numeric columns get fixed widths, shared between header and rows so the
+// columns stay aligned — point values are 1–3 digits and must never squeeze
+// the name, which takes all remaining space and should show in full.
+const PTS_COL_W = "clamp(30px, 2vw, 42px)";
+const TOT_COL_W = "clamp(34px, 2.4vw, 48px)";
+
 function StandingRow({
   s,
   i,
@@ -386,6 +392,7 @@ function StandingRow({
   rowHeight?: number;
 }) {
   const gold = i === 0 ? { color: "var(--color-gold)" } : {};
+  const fullName = name.split("|")[1];
   const sizing = rowHeight
     ? {
         height: rowHeight,
@@ -426,9 +433,15 @@ function StandingRow({
       </span>
       <span
         className={`truncate ${i < 3 ? "text-text-primary font-medium" : "text-text-primary"}`}
-        style={{ flex: "1.5 1 0", minWidth: 0, ...gold }}
+        style={{
+          flex: "1 1 0",
+          minWidth: 0,
+          // Very long names step the font down instead of truncating
+          ...(fullName.length > 20 ? { fontSize: "0.8em" } : {}),
+          ...gold,
+        }}
       >
-        {name.split("|")[1]}
+        {fullName}
         {s.tiebreakRequired && <Swords size={11} className="inline ml-1 text-amber-400" aria-label="Tiebreaker required" />}
       </span>
       {events.map((e) => {
@@ -437,16 +450,16 @@ function StandingRow({
         return (
           <span
             key={e.id}
-            className={`font-mono text-center ${isFirst ? "font-semibold" : "text-text-secondary"}`}
-            style={{ flex: "1 1 0", minWidth: 0, fontSize: "0.85em", ...(isFirst ? { color: "var(--color-gold)" } : {}) }}
+            className={`font-mono text-center shrink-0 ${isFirst ? "font-semibold" : "text-text-secondary"}`}
+            style={{ width: PTS_COL_W, fontSize: "0.85em", ...(isFirst ? { color: "var(--color-gold)" } : {}) }}
           >
             {pts ?? "—"}
           </span>
         );
       })}
       <span
-        className={`font-mono text-center font-semibold ${i < 3 ? "text-text-primary" : "text-text-secondary"}`}
-        style={{ flex: "1 1 0", minWidth: 0, fontSize: "0.9em", ...gold }}
+        className={`font-mono text-center font-semibold shrink-0 ${i < 3 ? "text-text-primary" : "text-text-secondary"}`}
+        style={{ width: TOT_COL_W, fontSize: "0.9em", ...gold }}
       >
         {s.total || "—"}
       </span>
@@ -466,13 +479,13 @@ function ColumnHeaders({ events }: { events: { id: EventId; name: string }[] }) 
     >
       <span style={{ width: "1.6em", marginRight: "0.3em" }} className="text-right shrink-0">#</span>
       <span style={{ width: "2em", marginRight: "0.3em", fontSize: "0.75em" }} className="shrink-0" />
-      <span style={{ flex: "1.5 1 0", minWidth: 0 }} className="truncate">Name</span>
+      <span style={{ flex: "1 1 0", minWidth: 0 }} className="truncate">Name</span>
       {events.map((e) => (
-        <span key={e.id} style={{ flex: "1 1 0", minWidth: 0, fontSize: "0.85em", textAlign: "center", display: "block" }}>
+        <span key={e.id} className="shrink-0" style={{ width: PTS_COL_W, fontSize: "0.85em", textAlign: "center" }}>
           {e.name.split(" ")[0].slice(0, 3)}
         </span>
       ))}
-      <span style={{ flex: "1 1 0", minWidth: 0, fontSize: "0.9em", textAlign: "center", display: "block" }}>Tot</span>
+      <span className="shrink-0" style={{ width: TOT_COL_W, fontSize: "0.9em", textAlign: "center" }}>Tot</span>
     </div>
   );
 }
