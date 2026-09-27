@@ -371,9 +371,11 @@ function EventStrip({ compact = false }: { compact?: boolean }) {
 
 // Numeric columns get fixed widths, shared between header and rows so the
 // columns stay aligned — point values are 1–3 digits and must never squeeze
-// the name, which takes all remaining space and should show in full.
-const PTS_COL_W = "clamp(30px, 2vw, 42px)";
-const TOT_COL_W = "clamp(34px, 2.4vw, 48px)";
+// the name, which takes all remaining space. Full names are the priority on
+// desktop; the low clamp floors keep narrow (900–1300px) windows giving the
+// name as much room as possible, with truncation as the small-screen fallback.
+const PTS_COL_W = "clamp(24px, 2vw, 42px)";
+const TOT_COL_W = "clamp(28px, 2.4vw, 48px)";
 
 function StandingRow({
   s,
