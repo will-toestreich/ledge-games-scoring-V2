@@ -62,16 +62,31 @@ export function useOutboxCount(): number {
 
 // ─── Reads ─────────────────────────────────────────────────
 
-export function useCompetitors() {
-  return useQuery({ queryKey: ["competitors"], queryFn: db.fetchCompetitors });
+// The optional refetchInterval overrides the 5s default (public scoreboard
+// honors Settings → refresh interval); spread conditionally so an absent
+// override falls back to the queryClient default instead of disabling polling.
+export function useCompetitors(refetchInterval?: number) {
+  return useQuery({
+    queryKey: ["competitors"],
+    queryFn: db.fetchCompetitors,
+    ...(refetchInterval !== undefined ? { refetchInterval } : {}),
+  });
 }
 
-export function useScores() {
-  return useQuery({ queryKey: ["scores"], queryFn: db.fetchScores });
+export function useScores(refetchInterval?: number) {
+  return useQuery({
+    queryKey: ["scores"],
+    queryFn: db.fetchScores,
+    ...(refetchInterval !== undefined ? { refetchInterval } : {}),
+  });
 }
 
-export function useKegAttempts() {
-  return useQuery({ queryKey: ["kegAttempts"], queryFn: db.fetchKegAttempts });
+export function useKegAttempts(refetchInterval?: number) {
+  return useQuery({
+    queryKey: ["kegAttempts"],
+    queryFn: db.fetchKegAttempts,
+    ...(refetchInterval !== undefined ? { refetchInterval } : {}),
+  });
 }
 
 export function useSettings() {
@@ -258,15 +273,24 @@ export function useActiveDivisions(): Division[] {
  * `freezeWhenScoreboardPaused` (scoreboard views only): while the director
  * has the scoreboard paused, keep returning the data from the moment of the
  * pause — resuming snaps straight to current. Admin views never pass it.
+ * The same flag marks the public board, which polls at the configurable
+ * Settings → refresh interval instead of the 5s default.
  */
 export function useDivisionScoring(
   divisionId: DivisionId,
   opts?: { freezeWhenScoreboardPaused?: boolean }
 ) {
-  const competitors = useCompetitors();
-  const scores = useScores();
-  const kegAttempts = useKegAttempts();
+  // Settings first: the public board's poll cadence comes from them. The
+  // settings query itself stays on the 5s default so interval and pause
+  // changes reach every screen within seconds.
   const { data: settings } = useSettings();
+  const isPublicBoard = Boolean(opts?.freezeWhenScoreboardPaused);
+  const boardRefetchMs = isPublicBoard
+    ? Math.min(300, Math.max(2, settings?.scoreboardRefreshSeconds ?? 5)) * 1000
+    : undefined;
+  const competitors = useCompetitors(boardRefetchMs);
+  const scores = useScores(boardRefetchMs);
+  const kegAttempts = useKegAttempts(boardRefetchMs);
 
   const ready =
     competitors.data !== undefined &&

@@ -125,6 +125,11 @@ export interface Settings {
    */
   scoreboardPaused?: boolean;
   /**
+   * How often the public scoreboard polls for new scores, in seconds.
+   * Unset = 5. Admin/scorer views keep their own faster cadence.
+   */
+  scoreboardRefreshSeconds?: number;
+  /**
    * Arrow-off results: when a division title ends tied, the field-resolved
    * winner (1 arrow, closest to bullseye) is recorded here by competitor id.
    */

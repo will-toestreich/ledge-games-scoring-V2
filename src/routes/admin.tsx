@@ -1196,6 +1196,8 @@ function SettingsTab() {
   const resetRoster = useResetActiveSeasonCompetitors();
   const qc = useQueryClient();
   const [pin, setPin] = useState<string | null>(null);
+  // null = showing the saved value; a string = unsaved edit in the input
+  const [refreshSecs, setRefreshSecs] = useState<string | null>(null);
   const { data: competitors } = useCompetitors();
   const { data: scores } = useScores();
   const { data: kegAttempts } = useKegAttempts();
@@ -1328,6 +1330,10 @@ function SettingsTab() {
 
   if (!settings) return null;
   const pinValue = pin ?? settings.scorerPin;
+  const savedRefresh = settings.scoreboardRefreshSeconds ?? 5;
+  const refreshValue = refreshSecs ?? String(savedRefresh);
+  const refreshParsed = Math.min(300, Math.max(2, Math.round(Number(refreshValue) || 0)));
+  const refreshDirty = refreshSecs !== null && refreshParsed !== savedRefresh;
 
   return (
     <div className="space-y-4 max-w-4xl">
@@ -1390,10 +1396,57 @@ function SettingsTab() {
             )}
           </button>
         </div>
+        {/* Poll cadence for the public board only — admin/scoring screens
+            keep their own 5s cadence regardless */}
+        <div className="mt-4 pt-4 border-t border-border-subtle flex items-center justify-between gap-4 flex-wrap">
+          <div>
+            <div className="text-sm font-medium text-text-primary flex items-center gap-2">
+              <Clock size={14} className="text-text-tertiary" /> Scoreboard Refresh Interval
+            </div>
+            <p className="text-sm text-text-secondary mt-0.5">
+              How often the public scoreboard pulls new scores. Default is 5 seconds — raise it to slow the board down.
+            </p>
+          </div>
+          <div className="flex items-center gap-1.5 shrink-0">
+            {[5, 10, 30, 60].map((s) => (
+              <button
+                key={s}
+                onClick={() => saveSettings.mutate({ scoreboardRefreshSeconds: s }, { onSuccess: () => setRefreshSecs(null) })}
+                disabled={saveSettings.isPending}
+                className={`text-xs font-medium px-2.5 py-1.5 rounded-lg border transition-all ${
+                  savedRefresh === s && !refreshDirty
+                    ? "bg-emerald-500/15 text-emerald-400 border-emerald-500/40"
+                    : "text-text-secondary border-border-subtle hover:text-text-primary hover:bg-surface-overlay"
+                }`}
+              >
+                {s}s
+              </button>
+            ))}
+            <input
+              type="number"
+              min={2}
+              max={300}
+              value={refreshValue}
+              onChange={(e) => setRefreshSecs(e.target.value)}
+              className="input w-20 text-center ml-1.5"
+              aria-label="Scoreboard refresh interval in seconds"
+            />
+            <span className="text-xs text-text-tertiary">sec</span>
+            {refreshDirty && (
+              <button
+                onClick={() => saveSettings.mutate({ scoreboardRefreshSeconds: refreshParsed }, { onSuccess: () => setRefreshSecs(null) })}
+                disabled={saveSettings.isPending}
+                className="btn-primary text-xs py-1.5 px-3 ml-1"
+              >
+                Save
+              </button>
+            )}
+          </div>
+        </div>
         {saveSettings.isError && (
           <p className="text-xs text-red-400 mt-2">
             Couldn't save: {String(saveSettings.error)}. If this mentions a missing column, run
-            supabase/migrations/002_scoreboard_pause.sql in the Supabase SQL Editor.
+            the files in supabase/migrations/ (002, 003) in the Supabase SQL Editor.
           </p>
         )}
       </div>
