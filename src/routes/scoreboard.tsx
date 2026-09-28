@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Link } from "@tanstack/react-router";
-import { Shield, Crosshair, Mic, Pause, Sun, Moon, Swords } from "lucide-react";
+import { Shield, Crosshair, Mic, Pause, Sun, Moon, Swords, Maximize, Minimize } from "lucide-react";
 import { useTheme } from "@/lib/theme";
 import { EventIcon } from "@/components/event-icons";
 import { BrandLogo } from "@/components/brand-logo";
@@ -20,6 +20,60 @@ function ScoreboardThemeToggle() {
       {theme === "dark" ? <Sun size={12} /> : <Moon size={12} />}
     </button>
   );
+}
+
+// ─── Full screen ──────────────────────────────────────────
+
+// Older Safari only ships the webkit-prefixed Fullscreen API
+type FsDocument = Document & {
+  webkitFullscreenElement?: Element | null;
+  webkitExitFullscreen?: () => void;
+};
+type FsElement = HTMLElement & { webkitRequestFullscreen?: () => void };
+
+/**
+ * Browser full screen for event-day TVs: hides every bit of browser chrome
+ * (URL bar, bookmarks, tabs) leaving only the scoreboard. Esc also exits.
+ */
+function useFullscreen() {
+  const [active, setActive] = useState(() => {
+    if (typeof document === "undefined") return false;
+    const doc = document as FsDocument;
+    return Boolean(doc.fullscreenElement ?? doc.webkitFullscreenElement);
+  });
+
+  useEffect(() => {
+    const doc = document as FsDocument;
+    const onChange = () => setActive(Boolean(doc.fullscreenElement ?? doc.webkitFullscreenElement));
+    document.addEventListener("fullscreenchange", onChange);
+    document.addEventListener("webkitfullscreenchange", onChange);
+    return () => {
+      document.removeEventListener("fullscreenchange", onChange);
+      document.removeEventListener("webkitfullscreenchange", onChange);
+    };
+  }, []);
+
+  const toggle = useCallback(() => {
+    const doc = document as FsDocument;
+    const root = document.documentElement as FsElement;
+    if (doc.fullscreenElement ?? doc.webkitFullscreenElement) {
+      if (doc.exitFullscreen) void doc.exitFullscreen().catch(() => {});
+      else doc.webkitExitFullscreen?.();
+    } else {
+      if (root.requestFullscreen) void root.requestFullscreen().catch(() => {});
+      else root.webkitRequestFullscreen?.();
+    }
+  }, []);
+
+  // iPhones have no Fullscreen API — the button simply doesn't render there
+  const supported =
+    typeof document !== "undefined" &&
+    Boolean(
+      document.documentElement.requestFullscreen ??
+        (document.documentElement as FsElement).webkitRequestFullscreen
+    );
+
+  return { active, toggle, supported };
 }
 
 // ─── Responsive mode ──────────────────────────────────────
@@ -53,6 +107,7 @@ export function ScoreboardPage() {
   const isLive = activeComp?.status === "active";
   const activeDivisions = useActiveDivisions();
   const compact = useIsCompact();
+  const fs = useFullscreen();
   // A disabled division can't be viewed (e.g. Mentors toggled off mid-view)
   const effectiveView: View =
     view !== "overview" && !activeDivisions.some((d) => d.id === view) ? "overview" : view;
@@ -84,16 +139,30 @@ export function ScoreboardPage() {
         </Link>
 
         <div className="ml-auto flex items-center" style={{ gap: "clamp(6px, 0.6vw, 12px)" }}>
-          <Link to="/admin" className="text-text-tertiary hover:text-text-primary transition-colors inline-flex items-center" style={{ gap: "clamp(2px, 0.2vw, 4px)", fontSize: "clamp(8px, 0.5vw, 10px)" }}>
-            <Shield size={12} /> Admin
-          </Link>
-          <Link to="/score" className="text-text-tertiary hover:text-text-primary transition-colors inline-flex items-center" style={{ gap: "clamp(2px, 0.2vw, 4px)", fontSize: "clamp(8px, 0.5vw, 10px)" }}>
-            <Crosshair size={12} /> Scoring
-          </Link>
-          <Link to="/mc" className="text-text-tertiary hover:text-text-primary transition-colors inline-flex items-center" style={{ gap: "clamp(2px, 0.2vw, 4px)", fontSize: "clamp(8px, 0.5vw, 10px)" }}>
-            <Mic size={12} /> MC
-          </Link>
+          {/* Crew links disappear in full screen — spectators see only the board */}
+          {!fs.active && (
+            <>
+              <Link to="/admin" className="text-text-tertiary hover:text-text-primary transition-colors inline-flex items-center" style={{ gap: "clamp(2px, 0.2vw, 4px)", fontSize: "clamp(8px, 0.5vw, 10px)" }}>
+                <Shield size={12} /> Admin
+              </Link>
+              <Link to="/score" className="text-text-tertiary hover:text-text-primary transition-colors inline-flex items-center" style={{ gap: "clamp(2px, 0.2vw, 4px)", fontSize: "clamp(8px, 0.5vw, 10px)" }}>
+                <Crosshair size={12} /> Scoring
+              </Link>
+              <Link to="/mc" className="text-text-tertiary hover:text-text-primary transition-colors inline-flex items-center" style={{ gap: "clamp(2px, 0.2vw, 4px)", fontSize: "clamp(8px, 0.5vw, 10px)" }}>
+                <Mic size={12} /> MC
+              </Link>
+            </>
+          )}
           <ScoreboardThemeToggle />
+          {fs.supported && (
+            <button
+              onClick={fs.toggle}
+              className="text-text-tertiary hover:text-text-primary transition-colors"
+              title={fs.active ? "Exit full screen (Esc)" : "Full screen"}
+            >
+              {fs.active ? <Minimize size={12} /> : <Maximize size={12} />}
+            </button>
+          )}
           <div className="h-3 w-px bg-border-subtle" />
           {!isLive ? (
             // Archived seasons must never masquerade as a live competition
