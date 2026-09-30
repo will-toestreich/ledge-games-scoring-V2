@@ -401,13 +401,24 @@ function CompetitorsTab() {
       "Paid (yes/no)",
     ];
     const example = ["1", "Paul", "Bunyan", "mens", "The Axe", '"Brainerd, MN"', "paul@example.com", "XL", "no"];
-    const blob = new Blob([headers.join(",") + "\n" + example.join(",") + "\n"], { type: "text/csv" });
+    downloadCsv("competitor-import-template.csv", headers.join(",") + "\n" + example.join(",") + "\n");
+  }
+
+  function downloadCsv(filename: string, text: string) {
+    const blob = new Blob([text], { type: "text/csv" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = "competitor-import-template.csv";
+    a.download = filename;
     a.click();
     URL.revokeObjectURL(url);
+  }
+
+  // Exports the list as currently filtered/sorted — with no filters active,
+  // that's the whole active-season roster.
+  function exportCompetitorsCsv() {
+    const stamp = new Date().toISOString().slice(0, 10);
+    downloadCsv(`ledge-games-competitors-${stamp}.csv`, rosterCsv(sorted));
   }
 
   return (
@@ -464,6 +475,14 @@ function CompetitorsTab() {
           />
         </div>
         <div className="flex gap-2 ml-auto">
+          <button
+            onClick={exportCompetitorsCsv}
+            disabled={sorted.length === 0}
+            title={`Download the ${sorted.length} competitor${sorted.length !== 1 ? "s" : ""} currently shown (filters apply)`}
+            className="btn-ghost text-xs py-1.5 inline-flex items-center gap-1.5 disabled:opacity-40"
+          >
+            <Download size={13} /> Export CSV
+          </button>
           <button onClick={downloadTemplate} className="btn-ghost text-xs py-1.5 inline-flex items-center gap-1.5">
             <Download size={13} /> Template
           </button>
