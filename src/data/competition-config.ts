@@ -37,7 +37,9 @@ function repeat(plan: Omit<RoundPlan, never>, n: number): RoundPlan[] {
 const archeryRound: RoundPlan = { attempts: 1, attemptAgg: "sum", maxPerAttempt: 25, attemptLabel: "5 arrows — total points" };
 const axeRegular: RoundPlan = { attempts: 2, attemptAgg: "sum", maxPerAttempt: 9, attemptLabel: "2 sets of 3 axes" };
 const axeFinal: RoundPlan = { attempts: 1, attemptAgg: "sum", maxPerAttempt: 15, attemptLabel: "1 set of 5 axes" };
-const hammerV: RoundPlan = { attempts: 2, attemptAgg: "sum", maxPerAttempt: 50, attemptLabel: "2 sets of 2 throws (V target)" };
+// V-target sets score per log downed (front 10 / back 20); one throw can take
+// multiple logs — 2 hammers can down 3 logs, so a set tops out at 10+20+20=50.
+const hammerV: RoundPlan = { attempts: 2, attemptAgg: "sum", maxPerAttempt: 50, attemptLabel: "2 sets of 2 throws (V: 10/front log, 20/back log)" };
 const hammerBack: RoundPlan = { attempts: 1, attemptAgg: "sum", maxPerAttempt: 60, attemptLabel: "1 set of 3 throws (back row, 20 each)" };
 const caberRound: RoundPlan = { attempts: 2, attemptAgg: "best", maxPerAttempt: 10, attemptLabel: "2 flips — better one counts" };
 const chopRegular: RoundPlan = { attempts: 1, attemptAgg: "sum", attemptLabel: "3 pieces — total seconds" };
