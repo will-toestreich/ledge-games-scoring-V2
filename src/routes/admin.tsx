@@ -2379,6 +2379,59 @@ function MissionControlTab() {
         </div>
       )}
 
+      <div>
+        <h3 className="text-sm font-semibold text-text-secondary uppercase tracking-wider mb-3">Event Status</h3>
+        <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-3">
+          {events.map((event) => (
+            <EventStatusCard
+              key={event.id}
+              event={event}
+              byDiv={byDiv}
+              pace={paceFor(event.id)}
+              lastActivity={lastActivity.get(event.id)}
+              now={now}
+              live={isLive}
+            />
+          ))}
+        </div>
+      </div>
+
+      <div>
+        <h3 className="text-sm font-semibold text-text-secondary uppercase tracking-wider mb-3">Division Leaders</h3>
+        <div className="grid gap-3 md:grid-cols-3">
+          {activeDivisions.map((div) => {
+            const data = byDiv[div.id].data!;
+            const top3 = data.standings.slice(0, 3);
+            const byId = new Map(data.field.map((c) => [c.id, c]));
+            return (
+              <div key={div.id} className="card rounded-xl overflow-hidden">
+                <div className="px-4 py-2.5 flex items-center justify-between" style={{ background: `${div.color}20` }}>
+                  <span className="font-semibold text-sm text-text-primary">{div.name}</span>
+                  <span className="text-xs text-text-tertiary font-mono">{data.standings.length}</span>
+                </div>
+                <div className="p-3 space-y-1.5">
+                  {top3.map((s, i) => {
+                    const c = byId.get(s.competitorId)!;
+                    return (
+                      <div key={s.competitorId} className="flex items-center gap-2.5 text-sm">
+                        <span className="w-5 text-right font-mono text-text-tertiary text-xs">{s.rank}</span>
+                        <span className="bib-badge text-[10px] py-0.5 px-1.5" style={{ backgroundColor: div.color, minWidth: "1.75rem" }}>
+                          {c.bibNumber}
+                        </span>
+                        <span className={`flex-1 truncate ${i === 0 ? "font-semibold text-text-primary" : "text-text-secondary"}`}>
+                          {c.firstName} {c.lastName}
+                        </span>
+                        <span className="font-mono text-xs text-text-tertiary">{s.total} pts</span>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+
       {isLive && chaseRows.length > 0 && (
         <div>
           <h3 className="text-sm font-semibold text-text-secondary uppercase tracking-wider mb-3">
@@ -2466,59 +2519,6 @@ function MissionControlTab() {
           </div>
         </div>
       )}
-
-      <div>
-        <h3 className="text-sm font-semibold text-text-secondary uppercase tracking-wider mb-3">Event Status</h3>
-        <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-3">
-          {events.map((event) => (
-            <EventStatusCard
-              key={event.id}
-              event={event}
-              byDiv={byDiv}
-              pace={paceFor(event.id)}
-              lastActivity={lastActivity.get(event.id)}
-              now={now}
-              live={isLive}
-            />
-          ))}
-        </div>
-      </div>
-
-      <div>
-        <h3 className="text-sm font-semibold text-text-secondary uppercase tracking-wider mb-3">Division Leaders</h3>
-        <div className="grid gap-3 md:grid-cols-3">
-          {activeDivisions.map((div) => {
-            const data = byDiv[div.id].data!;
-            const top3 = data.standings.slice(0, 3);
-            const byId = new Map(data.field.map((c) => [c.id, c]));
-            return (
-              <div key={div.id} className="card rounded-xl overflow-hidden">
-                <div className="px-4 py-2.5 flex items-center justify-between" style={{ background: `${div.color}20` }}>
-                  <span className="font-semibold text-sm text-text-primary">{div.name}</span>
-                  <span className="text-xs text-text-tertiary font-mono">{data.standings.length}</span>
-                </div>
-                <div className="p-3 space-y-1.5">
-                  {top3.map((s, i) => {
-                    const c = byId.get(s.competitorId)!;
-                    return (
-                      <div key={s.competitorId} className="flex items-center gap-2.5 text-sm">
-                        <span className="w-5 text-right font-mono text-text-tertiary text-xs">{s.rank}</span>
-                        <span className="bib-badge text-[10px] py-0.5 px-1.5" style={{ backgroundColor: div.color, minWidth: "1.75rem" }}>
-                          {c.bibNumber}
-                        </span>
-                        <span className={`flex-1 truncate ${i === 0 ? "font-semibold text-text-primary" : "text-text-secondary"}`}>
-                          {c.firstName} {c.lastName}
-                        </span>
-                        <span className="font-mono text-xs text-text-tertiary">{s.total} pts</span>
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-            );
-          })}
-        </div>
-      </div>
     </div>
   );
 }
