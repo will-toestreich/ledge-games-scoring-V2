@@ -5,11 +5,11 @@
 // public-announcement material by definition.
 
 import { useMemo, useState } from "react";
-import { CheckCircle2, Clock, Mic, Minus, Search, TrendingDown, TrendingUp } from "lucide-react";
+import { CheckCircle2, Clock, Mic, Minus, Scissors, Search, TrendingDown, TrendingUp, Trophy } from "lucide-react";
 import { EventIcon } from "@/components/event-icons";
 import { divisionEvents } from "@/data/competition-config";
 import { useActiveCompetition, useActiveDivisions, useDivisionScoring, useSettings } from "@/data/hooks";
-import { eventProgress, pendingScorers, type EventResults, type Standing } from "@/lib/scoring";
+import { eventProgress, pendingScorers, projectedCut, roundReadiness, type EventResults, type Standing } from "@/lib/scoring";
 import type { Competitor, Division, DivisionId, EventId } from "@/lib/types";
 
 interface DivisionScoringData {
@@ -102,7 +102,7 @@ function EventStatusList({
     const res = eventResults.get(e.id)!;
     const p = eventProgress(res);
     const pending = live && p.started ? pendingScorers(res) : null;
-    return { e, p, pending };
+    return { e, p, pending, res };
   });
   const livePcts = infos
     .filter((x) => x.p.started && !x.p.complete)
@@ -117,7 +117,18 @@ function EventStatusList({
 
   return (
     <div className="space-y-3">
-      {infos.map(({ e, p, pending }) => {
+      {infos.map(({ e, p, pending, res }) => {
+        // Every round's cut line: locked cuts as settled facts, the working
+        // round's moving line as an amber projection.
+        const proj = live && p.started && !p.complete ? projectedCut(res) : null;
+        const cutChips = res.cuts
+          .map((cut) => {
+            if (cut.locked && cut.bubbleScore !== null) return { kind: "locked" as const, cut };
+            if (proj && proj.afterRound === cut.afterRound && proj.bubbleScore !== null)
+              return { kind: "projected" as const, cut: proj };
+            return null;
+          })
+          .filter((x): x is NonNullable<typeof x> => x !== null);
         const pace =
           !live || !p.started || p.complete
             ? null
@@ -168,6 +179,31 @@ function EventStatusList({
                 ) : null}
               </div>
             </div>
+            {cutChips.length > 0 && (
+              <div className="mt-2.5 flex flex-wrap gap-1.5">
+                {cutChips.map(({ kind, cut }) => (
+                  <span
+                    key={cut.afterRound}
+                    className={`inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full border ${
+                      kind === "locked"
+                        ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-400"
+                        : "border-amber-500/30 bg-amber-500/10 text-amber-400"
+                    }`}
+                    title={
+                      kind === "locked"
+                        ? `After Rd ${cut.afterRound}: top ${cut.target}${cut.advancerIds.length > cut.target ? ` (+${cut.advancerIds.length - cut.target} on ties)` : ""} advanced — the cut is settled`
+                        : `Projected from ${cut.scoredCount}/${cut.eligibleCount} scored — moves until Rd ${cut.afterRound} completes`
+                    }
+                  >
+                    <Scissors size={10} className="shrink-0" />
+                    Rd {cut.afterRound} {kind === "locked" ? "cut" : "proj."} @ {cut.bubbleScore!.toFixed(e.decimals)} {e.unit}
+                    {" · top "}
+                    {cut.target}
+                    {cut.advancerIds.length > cut.target ? `+${cut.advancerIds.length - cut.target}` : ""}
+                  </span>
+                ))}
+              </div>
+            )}
             {owed.length > 0 && pending && (
               <div className="mt-3">
                 <div className="text-[10px] font-semibold uppercase tracking-wider mb-1.5" style={{ color: division.color }}>
@@ -222,6 +258,33 @@ export function AnnouncerPage() {
     [view, activeDivisions, scoring.mens.data, scoring.womens.data, scoring.mentors.data, isLiveSeason]
   );
 
+  // Finals alerts: an event whose last cut just locked hands the mic a
+  // finals lineup to announce. Computed across ALL divisions so the alert
+  // shows no matter which division pill is selected.
+  const finalsReady = useMemo(
+    () =>
+      !isLiveSeason
+        ? []
+        : activeDivisions.flatMap((d) => {
+            const data = scoring[d.id].data;
+            if (!data) return [];
+            const byId = new Map(data.field.map((c) => [c.id, c]));
+            return [...data.eventResults.entries()]
+              .map(([eventId, res]) => {
+                const r = roundReadiness(res);
+                if (!r?.isFinals) return null;
+                return {
+                  division: d,
+                  event: divisionEvents(d.id).find((e) => e.id === eventId)!,
+                  finalists: r.advancerIds.map((id) => byId.get(id)!).filter(Boolean),
+                };
+              })
+              .filter((x): x is NonNullable<typeof x> => x !== null);
+          }),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [activeDivisions, scoring.mens.data, scoring.womens.data, scoring.mentors.data, isLiveSeason]
+  );
+
   const q = search.trim().toLowerCase();
   const shown = rows
     .filter(
@@ -243,6 +306,38 @@ export function AnnouncerPage() {
           {settings ? `${settings.competitionName} · ${settings.year}` : ""} — live standings for the mic
         </p>
       </div>
+
+      {/* Ready-for-finals alerts — the mic's cue to gather the finalists */}
+      {finalsReady.length > 0 && (
+        <div className="space-y-2 mb-5">
+          {finalsReady.map(({ division: d, event, finalists }) => (
+            <div
+              key={`${event.id}-${d.id}`}
+              className="rounded-xl border border-emerald-500/40 bg-emerald-500/10 px-4 py-3 animate-fade-in"
+            >
+              <div className="flex items-center gap-2 text-sm font-semibold text-emerald-400">
+                <Trophy size={15} className="shrink-0" />
+                <span className="min-w-0">
+                  {event.name} · <span style={{ color: d.color }}>{d.name}</span> — READY FOR FINALS
+                </span>
+              </div>
+              <div className="mt-1.5 flex flex-wrap gap-1">
+                {finalists.map((c) => (
+                  <span
+                    key={c.id}
+                    className="inline-flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded text-white font-medium"
+                    style={{ backgroundColor: d.color }}
+                  >
+                    <span className="font-mono font-bold">{c.bibNumber}</span>
+                    {c.firstName} {c.lastName}
+                    {c.nickname ? ` “${c.nickname}”` : ""}
+                  </span>
+                ))}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
 
       {/* Division pills — All (merged, the default) or one division */}
       <div className="flex gap-2 mb-4 flex-wrap">
