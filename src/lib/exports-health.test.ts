@@ -43,10 +43,10 @@ describe("csv exports", () => {
 describe("data health check", () => {
   it("the real 2025 season yields exactly one KNOWN historical finding", () => {
     const report = checkDataHealth(season.competitors, season.scores, season.kegAttempts);
-    // The 2025 sheets recorded 39 hammer set values above the current rules'
-    // theoretical max (2 throws × 20-pt back logs = 40). Historical record,
-    // imported as-is — the check is right to flag it, and this test pins it
-    // so any NEW kind of junk still fails loudly.
+    // V-round hammer sets cap at 50 (ruling 2026-09-29; was 40). One 2025
+    // sheet value (a 60) still exceeds it. Historical record, imported as-is —
+    // the check is right to flag it, and this test pins it so any NEW kind of
+    // junk still fails loudly.
     expect(report.findings).toHaveLength(1);
     expect(report.findings[0]).toContain("exceed the round's max");
     expect(report.checked.competitors).toBe(season.competitors.length);
