@@ -108,6 +108,21 @@ export function ScoreboardPage() {
   const activeDivisions = useActiveDivisions();
   const compact = useIsCompact();
   const fs = useFullscreen();
+
+  // Keyboard shortcut: F toggles full screen (Esc already exits natively)
+  const toggleFs = fs.toggle;
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== "f" && e.key !== "F") return;
+      if (e.metaKey || e.ctrlKey || e.altKey) return;
+      const t = e.target as HTMLElement | null;
+      if (t && (t.tagName === "INPUT" || t.tagName === "TEXTAREA" || t.isContentEditable)) return;
+      toggleFs();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [toggleFs]);
+
   // A disabled division can't be viewed (e.g. Mentors toggled off mid-view)
   const effectiveView: View =
     view !== "overview" && !activeDivisions.some((d) => d.id === view) ? "overview" : view;
@@ -158,7 +173,7 @@ export function ScoreboardPage() {
             <button
               onClick={fs.toggle}
               className="text-text-tertiary hover:text-text-primary transition-colors"
-              title={fs.active ? "Exit full screen (Esc)" : "Full screen"}
+              title={fs.active ? "Exit full screen (F or Esc)" : "Full screen (F)"}
             >
               {fs.active ? <Minimize size={12} /> : <Maximize size={12} />}
             </button>
