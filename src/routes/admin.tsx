@@ -1404,7 +1404,7 @@ function SettingsTab() {
               <Clock size={14} className="text-text-tertiary" /> Scoreboard Refresh Interval
             </div>
             <p className="text-sm text-text-secondary mt-0.5">
-              How often the public scoreboard pulls new scores. Default is 5 seconds — raise it to slow the board down.
+              How often the public scoreboard updates what it shows. Default is 5 seconds — raise it to slow the board down.
             </p>
           </div>
           <div className="flex items-center gap-1.5 shrink-0">

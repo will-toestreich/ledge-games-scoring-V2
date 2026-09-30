@@ -1,7 +1,7 @@
 // TanStack Query data layer. Components talk to these hooks only —
 // never to db.ts directly — so the Supabase swap stays invisible.
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   QueryClient,
   useMutation,
@@ -267,6 +267,31 @@ export function useActiveDivisions(): Division[] {
 // ─── Derived: engine outputs ───────────────────────────────
 
 /**
+ * Public-scoreboard display cadence. The data layer refreshes whenever it
+ * likes — Supabase Realtime pushes every change instantly, focus and
+ * cross-tab events refetch too — so honoring the director's refresh-interval
+ * setting can't happen at the network level. Instead the board's VISIBLE
+ * snapshot is released at most once per interval: the newest data always
+ * lands, just on the configured rhythm.
+ */
+function useThrottledValue<T>(value: T, intervalMs: number, enabled: boolean): T {
+  const [released, setReleased] = useState<T>(value);
+  const lastReleaseAt = useRef(0);
+  useEffect(() => {
+    if (!enabled) return;
+    // First data (lastReleaseAt 0) releases immediately; after that, the
+    // newest value waits out the remainder of the interval.
+    const wait = Math.max(0, intervalMs - (Date.now() - lastReleaseAt.current));
+    const id = setTimeout(() => {
+      lastReleaseAt.current = Date.now();
+      setReleased(value);
+    }, wait);
+    return () => clearTimeout(id);
+  }, [value, intervalMs, enabled]);
+  return enabled ? released : value;
+}
+
+/**
  * Live standings + per-event results for one division, recomputed whenever
  * the underlying data changes. Everything every view shows comes from here.
  *
@@ -316,11 +341,15 @@ export function useDivisionScoring(
     };
   }, [ready, divisionId, competitors.data, scores.data, kegAttempts.data, titleTiebreakWinner]);
 
+  // Board cadence first (release newest data once per interval), then the
+  // pause freeze on top of whatever the board is currently showing.
+  const display = useThrottledValue(value, boardRefetchMs ?? 5_000, isPublicBoard);
+
   // Snapshot captured AT the moment the pause flips on; deliberately not
-  // keyed on `value` — updating the snapshot while frozen defeats the pause.
+  // keyed on `display` — updating the snapshot while frozen defeats the pause.
   const frozen = Boolean(opts?.freezeWhenScoreboardPaused && settings?.scoreboardPaused);
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  const heldAtPause = useMemo(() => value, [frozen]);
+  const heldAtPause = useMemo(() => display, [frozen]);
 
-  return { data: frozen ? (heldAtPause ?? value) : value, isLoading: !ready };
+  return { data: frozen ? (heldAtPause ?? display) : display, isLoading: !ready };
 }
