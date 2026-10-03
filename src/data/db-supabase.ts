@@ -473,25 +473,41 @@ export async function deleteCompetition(id: string): Promise<void> {
 
 // ─── Reads (active competition) ────────────────────────────
 
+/**
+ * PostgREST caps every response at 1,000 rows — a busy season blows past
+ * that mid-event (scores silently stopped appearing at row 1,001). Page
+ * through with a stable order so reads always return EVERYTHING.
+ */
+async function fetchAllRows(table: string, competitionId: string): Promise<Record<string, unknown>[]> {
+  const PAGE = 1000;
+  const rows: Record<string, unknown>[] = [];
+  for (let from = 0; ; from += PAGE) {
+    const { data, error } = await sb()
+      .from(table)
+      .select("*")
+      .eq("competition_id", competitionId)
+      .order("id")
+      .range(from, from + PAGE - 1);
+    fail(error);
+    rows.push(...((data ?? []) as Record<string, unknown>[]));
+    if (!data || data.length < PAGE) return rows;
+  }
+}
+
 export async function fetchCompetitors(): Promise<Competitor[]> {
   const id = await getActiveId();
-  const { data, error } = await sb().from("v2_competitors").select("*").eq("competition_id", id).order("bib_number");
-  fail(error);
-  return (data ?? []).map(rowToCompetitor);
+  const rows = await fetchAllRows("v2_competitors", id);
+  return rows.map(rowToCompetitor).sort((a, b) => a.bibNumber - b.bibNumber);
 }
 
 export async function fetchScores(): Promise<AttemptScore[]> {
   const id = await getActiveId();
-  const { data, error } = await sb().from("v2_scores").select("*").eq("competition_id", id);
-  fail(error);
-  return (data ?? []).map(rowToScore);
+  return (await fetchAllRows("v2_scores", id)).map(rowToScore);
 }
 
 export async function fetchKegAttempts(): Promise<KegAttempt[]> {
   const id = await getActiveId();
-  const { data, error } = await sb().from("v2_keg_attempts").select("*").eq("competition_id", id);
-  fail(error);
-  return (data ?? []).map(rowToKeg);
+  return (await fetchAllRows("v2_keg_attempts", id)).map(rowToKeg);
 }
 
 export async function fetchSettings(): Promise<Settings> {
@@ -727,21 +743,20 @@ export async function exportBackup(): Promise<string> {
   const competitions: BackupCompetition[] = [];
   for (const raw of comps ?? []) {
     const row = raw as CompetitionRow;
+    // Paged reads — the 2025 season alone has >1,000 score rows, and the
+    // old single requests silently truncated every backup at 1,000
     const [c, s, k] = await Promise.all([
-      sb().from("v2_competitors").select("*").eq("competition_id", row.id),
-      sb().from("v2_scores").select("*").eq("competition_id", row.id),
-      sb().from("v2_keg_attempts").select("*").eq("competition_id", row.id),
+      fetchAllRows("v2_competitors", row.id),
+      fetchAllRows("v2_scores", row.id),
+      fetchAllRows("v2_keg_attempts", row.id),
     ]);
-    fail(c.error);
-    fail(s.error);
-    fail(k.error);
     competitions.push({
       id: row.id,
       status: row.status,
       settings: rowToSettings(row),
-      competitors: (c.data ?? []).map(rowToCompetitor),
-      scores: (s.data ?? []).map(rowToScore),
-      kegAttempts: (k.data ?? []).map(rowToKeg),
+      competitors: c.map(rowToCompetitor),
+      scores: s.map(rowToScore),
+      kegAttempts: k.map(rowToKeg),
     });
   }
   return JSON.stringify({ competitions, activeId }, null, 1);
