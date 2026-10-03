@@ -313,9 +313,12 @@ export function useDivisionScoring(
   const boardRefetchMs = isPublicBoard
     ? Math.min(300, Math.max(2, settings?.scoreboardRefreshSeconds ?? 5)) * 1000
     : undefined;
-  const competitors = useCompetitors(boardRefetchMs);
-  const scores = useScores(boardRefetchMs);
-  const kegAttempts = useKegAttempts(boardRefetchMs);
+  // Fetch at the normal fast cadence even on the public board — the refresh
+  // interval gates only the DISPLAY below. Slowing the fetches too stacked
+  // two waits (poll + gate ≈ 2× the setting) and made live entries look lost.
+  const competitors = useCompetitors();
+  const scores = useScores();
+  const kegAttempts = useKegAttempts();
 
   const ready =
     competitors.data !== undefined &&
